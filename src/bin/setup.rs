@@ -27,7 +27,7 @@ use installer::Installer;
 const WS_CAPTION: u32 = 0x00C00000;
 const BST_CHECKED: usize = 1;
 
-const EMBEDDED_UPM: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/embedded_upm.bin"));
+const EMBEDDED_RAY: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/embedded_ray.bin"));
 const EMBEDDED_UNINSTALLER: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/embedded_uninstaller.bin"));
 
 const IDC_INSTALL_BTN: usize = 1001;
@@ -102,7 +102,7 @@ unsafe extern "system" fn window_proc(
             };
 
             // Title Header
-            make_label("Install UPM 0.1.0 (64-bit)", 30, 20, 480, 30, font_title);
+            make_label("Install RAY 0.1.0 (64-bit)", 30, 20, 480, 30, font_title);
 
             // Author credit & subhead
             make_label("Universal Package Manager  •  Engineered & Built by Sarvesh.S", 30, 52, 480, 22, font_author);
@@ -121,7 +121,7 @@ unsafe extern "system" fn window_proc(
 
             // Add to PATH Checkbox (Checked by default!)
             let button_class = to_wide("BUTTON");
-            let chk_text = to_wide("Add UPM to PATH (recommended for global command line access)");
+            let chk_text = to_wide("Add RAY to PATH (recommended for global command line access)");
             let h_chk = CreateWindowExW(
                 0,
                 button_class.as_ptr(),
@@ -212,38 +212,41 @@ fn perform_gui_install(hwnd: HWND) {
     };
 
     unsafe {
-        let installing_text = to_wide("Installing UPM and configuring environment...");
+        let installing_text = to_wide("Installing RAY and configuring environment...");
         SetWindowTextW(status_hwnd, installing_text.as_ptr());
     }
 
     let install_dir = Installer::default_install_dir();
-    let dest_exe = install_dir.join("upm.exe");
-    let dest_uninstaller = install_dir.join("upm-uninstaller.exe");
+    let dest_exe = install_dir.join("ray.exe");
+    let dest_uninstaller = install_dir.join("ray-uninstaller.exe");
 
     let install_result: Result<(), String> = (|| {
         std::fs::create_dir_all(&install_dir)
             .map_err(|e| format!("Failed to create folder: {}", e))?;
 
-        // 1. Write or copy upm.exe
-        if !EMBEDDED_UPM.is_empty() {
-            std::fs::write(&dest_exe, EMBEDDED_UPM)
-                .map_err(|e| format!("Failed to write upm.exe: {}", e))?;
+        // 1. Write or copy ray.exe
+        if !EMBEDDED_RAY.is_empty() {
+            std::fs::write(&dest_exe, EMBEDDED_RAY)
+                .map_err(|e| format!("Failed to write ray.exe: {}", e))?;
         } else {
-            let src = Installer::locate_upm_binary(None)?;
+            let src = Installer::locate_binary(None)?;
             if src.canonicalize().ok() != dest_exe.canonicalize().ok() {
                 std::fs::copy(&src, &dest_exe)
-                    .map_err(|e| format!("Failed to copy upm.exe: {}", e))?;
+                    .map_err(|e| format!("Failed to copy ray.exe: {}", e))?;
             }
         }
 
-        // 2. Write or copy upm-uninstaller.exe
+        // 2. Write or copy ray-uninstaller.exe
         if !EMBEDDED_UNINSTALLER.is_empty() {
             let _ = std::fs::write(&dest_uninstaller, EMBEDDED_UNINSTALLER);
         } else if let Ok(current) = std::env::current_exe() {
             if let Some(parent) = current.parent() {
-                let uninst = parent.join("upm-uninstaller.exe");
-                if uninst.exists() {
-                    let _ = std::fs::copy(uninst, &dest_uninstaller);
+                for name in &["ray-uninstaller.exe", "upm-uninstaller.exe"] {
+                    let uninst = parent.join(name);
+                    if uninst.exists() {
+                        let _ = std::fs::copy(uninst, &dest_uninstaller);
+                        break;
+                    }
                 }
             }
         }
@@ -265,20 +268,20 @@ fn perform_gui_install(hwnd: HWND) {
                 let done_text = to_wide("Installation Complete!");
                 SetWindowTextW(status_hwnd, done_text.as_ptr());
 
-                let title = to_wide("UPM Setup - Complete");
+                let title = to_wide("RAY Setup - Complete");
                 let message = to_wide(
-                    "Thanks for choosing UPM!\n\
+                    "Thanks for choosing RAY!\n\
                     Engineered & Built by Sarvesh.S\n\n\
                     Installation completed successfully.\n\
                     Opening PowerShell for you now to get started!"
                 );
                 MessageBoxW(hwnd, message.as_ptr(), title.as_ptr(), MB_OK | MB_ICONINFORMATION);
 
-                // Open a new interactive PowerShell terminal running 'upm version'
+                // Open a new interactive PowerShell terminal running 'ray version'
                 let _ = std::process::Command::new("powershell.exe")
                     .arg("-NoExit")
                     .arg("-Command")
-                    .arg("upm version")
+                    .arg("ray version")
                     .spawn();
 
                 DestroyWindow(hwnd);
@@ -286,7 +289,7 @@ fn perform_gui_install(hwnd: HWND) {
         }
         Err(err) => {
             unsafe {
-                let title = to_wide("UPM Setup - Error");
+                let title = to_wide("RAY Setup - Error");
                 let msg = to_wide(&format!("Installation failed:\n{}", err));
                 MessageBoxW(hwnd, msg.as_ptr(), title.as_ptr(), MB_OK);
             }
@@ -298,7 +301,7 @@ fn perform_gui_install(hwnd: HWND) {
 fn run_gui_setup() {
     unsafe {
         let hinstance = GetModuleHandleW(std::ptr::null());
-        let class_name = to_wide("UPMSetupWindowClass");
+        let class_name = to_wide("RAYSetupWindowClass");
 
         let wnd_class = WNDCLASSW {
             style: CS_HREDRAW | CS_VREDRAW,
@@ -315,7 +318,7 @@ fn run_gui_setup() {
 
         RegisterClassW(&wnd_class);
 
-        let window_title = to_wide("UPM Setup - Universal Package Manager");
+        let window_title = to_wide("RAY Setup - Universal Package Manager");
         let width = 540;
         let height = 410;
 
@@ -359,11 +362,11 @@ fn main() {
         let install_dir = Installer::default_install_dir();
         match Installer::install(None, Some(install_dir), should_add_to_path) {
             Ok(_) => {
-                println!("Thanks for choosing UPM! Built by Sarvesh.S");
+                println!("Thanks for choosing RAY! Built by Sarvesh.S");
                 let _ = std::process::Command::new("powershell.exe")
                     .arg("-NoExit")
                     .arg("-Command")
-                    .arg("upm version")
+                    .arg("ray version")
                     .spawn();
             }
             Err(e) => {

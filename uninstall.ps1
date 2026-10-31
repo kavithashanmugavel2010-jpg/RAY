@@ -1,4 +1,4 @@
-# UPM - Universal Package Manager PowerShell Uninstaller
+# RAY - Universal Package Manager PowerShell Uninstaller
 # Usage:
 #   powershell -ExecutionPolicy Bypass -File .\uninstall.ps1
 #   powershell -ExecutionPolicy Bypass -File .\uninstall.ps1 -RemoveFromPath
@@ -18,7 +18,7 @@ param(
     [switch]$CleanCache = $false,
 
     [Parameter(Mandatory = $false)]
-    [string]$InstallDir = "$env:LOCALAPPDATA\upm\bin",
+    [string]$InstallDir = "$env:LOCALAPPDATA\ray\bin",
 
     [Parameter(Mandatory = $false)]
     [switch]$Force = $false,
@@ -28,12 +28,12 @@ param(
 )
 
 if ($Help) {
-    Write-Host "UPM Windows Uninstaller" -ForegroundColor Cyan
+    Write-Host "RAY Windows Uninstaller" -ForegroundColor Cyan
     Write-Host "Parameters:"
-    Write-Host "  -RemoveFromPath    Remove UPM directory from User PATH (default: `$true)"
-    Write-Host "  -KeepPath          Keep UPM directory in User PATH"
-    Write-Host "  -CleanCache        Also remove global package cache store (%LOCALAPPDATA%\upm\store)"
-    Write-Host "  -InstallDir <path> Installation directory (default: %LOCALAPPDATA%\upm\bin)"
+    Write-Host "  -RemoveFromPath    Remove RAY directory from User PATH (default: `$true)"
+    Write-Host "  -KeepPath          Keep RAY directory in User PATH"
+    Write-Host "  -CleanCache        Also remove global package cache store (%LOCALAPPDATA%\ray\store)"
+    Write-Host "  -InstallDir <path> Installation directory (default: %LOCALAPPDATA%\ray\bin)"
     Write-Host "  -Force             Skip confirmation prompts"
     exit 0
 }
@@ -43,12 +43,12 @@ if ($KeepPath) {
 }
 
 Write-Host "==================================================================" -ForegroundColor Cyan
-Write-Host "  UPM - Universal Package Manager Uninstaller" -ForegroundColor White
+Write-Host "  RAY - Universal Package Manager Uninstaller" -ForegroundColor White
 Write-Host "==================================================================" -ForegroundColor Cyan
 Write-Host ""
 
 if (-not $Force) {
-    $confirm = Read-Host "Are you sure you want to completely uninstall UPM? (Y/n)"
+    $confirm = Read-Host "Are you sure you want to completely uninstall RAY? (Y/n)"
     if ($confirm -and $confirm.Trim().ToLower() -ne "y" -and $confirm.Trim().ToLower() -ne "yes") {
         Write-Host "Uninstallation cancelled." -ForegroundColor Yellow
         exit 0
@@ -56,13 +56,15 @@ if (-not $Force) {
 }
 
 # 1. Unregister from Windows Add/Remove Programs
-$regKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\UPM"
-if (Test-Path $regKey) {
-    try {
-        Remove-Item -Path $regKey -Recurse -Force
-        Write-Host "[UPM] Unregistered from Windows Settings / Control Panel." -ForegroundColor Green
-    } catch {
-        Write-Warning "[UPM] Could not remove Windows Settings registry entry: $_"
+foreach ($keyName in @("RAY", "UPM")) {
+    $regKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\$keyName"
+    if (Test-Path $regKey) {
+        try {
+            Remove-Item -Path $regKey -Recurse -Force
+            Write-Host "[RAY] Unregistered $keyName from Windows Settings / Control Panel." -ForegroundColor Green
+        } catch {
+            Write-Warning "[RAY] Could not remove Windows Settings registry entry: $_"
+        }
     }
 }
 
@@ -77,7 +79,7 @@ if ($RemoveFromPath) {
             }
             $newPath = $parts -join ';'
             [Environment]::SetEnvironmentVariable("Path", $newPath, "User")
-            Write-Host "[UPM] Removed '$InstallDir' from User PATH." -ForegroundColor Green
+            Write-Host "[RAY] Removed '$InstallDir' from User PATH." -ForegroundColor Green
         }
 
         # Also remove from current PowerShell session PATH
@@ -86,28 +88,32 @@ if ($RemoveFromPath) {
         }
         $env:Path = $currentParts -join ';'
     } catch {
-        Write-Warning "[UPM] Failed to clean User PATH: $_"
+        Write-Warning "[RAY] Failed to clean User PATH: $_"
     }
 } else {
-    Write-Host "[UPM] Preserved PATH entry for $InstallDir." -ForegroundColor Gray
+    Write-Host "[RAY] Preserved PATH entry for $InstallDir." -ForegroundColor Gray
 }
 
 # 3. Clean cache store if requested
 if ($CleanCache) {
-    $cacheDir = "$env:LOCALAPPDATA\upm\store"
-    $runDir = "$env:LOCALAPPDATA\upm\run"
-    if (Test-Path $cacheDir) {
-        Remove-Item -Path $cacheDir -Recurse -Force -ErrorAction SilentlyContinue
-        Write-Host "[UPM] Removed package cache store: $cacheDir" -ForegroundColor Green
-    }
-    if (Test-Path $runDir) {
-        Remove-Item -Path $runDir -Recurse -Force -ErrorAction SilentlyContinue
-        Write-Host "[UPM] Removed ephemeral runtime directory: $runDir" -ForegroundColor Green
+    foreach ($folder in @("ray", "upm")) {
+        $cacheDir = "$env:LOCALAPPDATA\$folder\store"
+        $runDir = "$env:LOCALAPPDATA\$folder\run"
+        if (Test-Path $cacheDir) {
+            Remove-Item -Path $cacheDir -Recurse -Force -ErrorAction SilentlyContinue
+            Write-Host "[RAY] Removed package cache store: $cacheDir" -ForegroundColor Green
+        }
+        if (Test-Path $runDir) {
+            Remove-Item -Path $runDir -Recurse -Force -ErrorAction SilentlyContinue
+            Write-Host "[RAY] Removed ephemeral runtime directory: $runDir" -ForegroundColor Green
+        }
     }
 }
 
 # 4. Remove binaries
 $filesToRemove = @(
+    (Join-Path $InstallDir "ray.exe"),
+    (Join-Path $InstallDir "ray-uninstaller.exe"),
     (Join-Path $InstallDir "upm.exe"),
     (Join-Path $InstallDir "upm-uninstaller.exe"),
     (Join-Path $InstallDir "uninstall.bat"),
@@ -118,9 +124,9 @@ foreach ($f in $filesToRemove) {
     if (Test-Path $f) {
         try {
             Remove-Item -Path $f -Force
-            Write-Host "[UPM] Deleted: $f" -ForegroundColor Green
+            Write-Host "[RAY] Deleted: $f" -ForegroundColor Green
         } catch {
-            Write-Warning "[UPM] Could not delete $f (file may be in use): $_"
+            Write-Warning "[RAY] Could not delete $f (file may be in use): $_"
         }
     }
 }
@@ -130,12 +136,12 @@ if (Test-Path $InstallDir) {
     $remaining = Get-ChildItem -Path $InstallDir
     if (-not $remaining) {
         Remove-Item -Path $InstallDir -Force -ErrorAction SilentlyContinue
-        Write-Host "[UPM] Removed directory: $InstallDir" -ForegroundColor Green
+        Write-Host "[RAY] Removed directory: $InstallDir" -ForegroundColor Green
     }
 }
 
 Write-Host ""
 Write-Host "==================================================================" -ForegroundColor Cyan
-Write-Host "  UPM has been successfully uninstalled!" -ForegroundColor Green
+Write-Host "  RAY has been successfully uninstalled!" -ForegroundColor Green
 Write-Host "==================================================================" -ForegroundColor Cyan
 Write-Host ""

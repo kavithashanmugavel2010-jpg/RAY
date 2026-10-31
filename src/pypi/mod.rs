@@ -48,7 +48,7 @@ pub struct PyPiClient {
 impl PyPiClient {
     pub fn new() -> Self {
         let http = reqwest::Client::builder()
-            .user_agent("upm/0.1.0 (Windows x86_64; Universal Package Manager)")
+            .user_agent("ray/0.1.0 (Windows x86_64; Universal Package Manager)")
             .pool_idle_timeout(Some(std::time::Duration::from_secs(30)))
             .tcp_nodelay(true)
             .build()

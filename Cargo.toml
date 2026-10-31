@@ -1,22 +1,22 @@
 [package]
-name = "upm"
+name = "ray"
 version = "0.1.0"
 edition = "2021"
 
 [[bin]]
-name = "upm"
+name = "ray"
 path = "src/main.rs"
 
 [[bin]]
-name = "upm-installer"
+name = "ray-installer"
 path = "src/bin/installer.rs"
 
 [[bin]]
-name = "upm-uninstaller"
+name = "ray-uninstaller"
 path = "src/bin/uninstaller.rs"
 
 [[bin]]
-name = "upm-setup"
+name = "ray-setup"
 path = "src/bin/setup.rs"
 
 [dependencies]

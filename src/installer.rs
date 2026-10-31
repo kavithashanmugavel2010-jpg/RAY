@@ -12,20 +12,20 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
     SendMessageTimeoutW, HWND_BROADCAST, SMTO_ABORTIFHUNG, WM_SETTINGCHANGE,
 };
 
-use crate::terminal::{init_console_vt, BADGE_UPM};
+use crate::terminal::{init_console_vt, BADGE_RAY};
 
 pub struct Installer;
 
 #[allow(dead_code)]
 impl Installer {
-    /// Returns the default installation directory (%LOCALAPPDATA%\upm\bin)
+    /// Returns the default installation directory (%LOCALAPPDATA%\ray\bin)
     pub fn default_install_dir() -> PathBuf {
         if let Ok(appdata) = std::env::var("LOCALAPPDATA") {
-            PathBuf::from(appdata).join("upm").join("bin")
+            PathBuf::from(appdata).join("ray").join("bin")
         } else if let Ok(userprofile) = std::env::var("USERPROFILE") {
-            PathBuf::from(userprofile).join(".upm").join("bin")
+            PathBuf::from(userprofile).join(".ray").join("bin")
         } else {
-            PathBuf::from(".upm").join("bin")
+            PathBuf::from(".ray").join("bin")
         }
     }
 
@@ -222,7 +222,7 @@ impl Installer {
         }
 
         let hint = if default_yes { "[Y/n]" } else { "[y/N]" };
-        print!("{} {} {} ", BADGE_UPM, question, hint);
+        print!("{} {} {} ", BADGE_RAY, question, hint);
         let _ = io::stdout().flush();
 
         let mut input = String::new();
@@ -242,8 +242,8 @@ impl Installer {
         }
     }
 
-    /// Finds a valid upm.exe binary to install
-    pub fn locate_upm_binary(explicit: Option<&Path>) -> Result<PathBuf, String> {
+    /// Finds a valid ray.exe binary to install (with fallback to upm.exe)
+    pub fn locate_binary(explicit: Option<&Path>) -> Result<PathBuf, String> {
         if let Some(p) = explicit {
             if p.exists() && p.is_file() {
                 return Ok(p.to_path_buf());
@@ -253,21 +253,26 @@ impl Installer {
 
         if let Ok(current) = std::env::current_exe() {
             let file_name = current.file_name().unwrap_or_default().to_string_lossy().to_lowercase();
-            if file_name == "upm.exe" || file_name == "upm" {
+            if file_name == "ray.exe" || file_name == "ray" || file_name == "upm.exe" || file_name == "upm" {
                 return Ok(current);
             }
 
             // Check adjacent directory
             if let Some(parent) = current.parent() {
-                let adjacent = parent.join("upm.exe");
-                if adjacent.exists() {
-                    return Ok(adjacent);
+                for candidate in &["ray.exe", "upm.exe"] {
+                    let adjacent = parent.join(candidate);
+                    if adjacent.exists() {
+                        return Ok(adjacent);
+                    }
                 }
             }
         }
 
         // Check relative paths from current working directory
         let candidates = [
+            PathBuf::from("ray.exe"),
+            PathBuf::from("target/release/ray.exe"),
+            PathBuf::from("target/debug/ray.exe"),
             PathBuf::from("upm.exe"),
             PathBuf::from("target/release/upm.exe"),
             PathBuf::from("target/debug/upm.exe"),
@@ -279,14 +284,19 @@ impl Installer {
             }
         }
 
-        Err("Could not find 'upm.exe'. Please build it first with 'cargo build --release' or specify the path.".to_string())
+        Err("Could not find 'ray.exe'. Please build it first with 'cargo build --release' or specify the path.".to_string())
     }
 
-    /// Registers UPM in Windows Add/Remove Programs (HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\UPM)
+    /// Compatibility alias for locate_binary
+    pub fn locate_upm_binary(explicit: Option<&Path>) -> Result<PathBuf, String> {
+        Self::locate_binary(explicit)
+    }
+
+    /// Registers RAY in Windows Add/Remove Programs (HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\RAY)
     pub fn register_windows_uninstall(install_dir: &Path, exe_path: &Path) -> Result<(), String> {
         unsafe {
             let mut hkey: HKEY = std::ptr::null_mut();
-            let subkey: Vec<u16> = OsStr::new("Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\UPM\0")
+            let subkey: Vec<u16> = OsStr::new("Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\RAY\0")
                 .encode_wide()
                 .collect();
 
@@ -320,7 +330,7 @@ impl Installer {
                 );
             };
 
-            let uninstaller_exe = install_dir.join("upm-uninstaller.exe");
+            let uninstaller_exe = install_dir.join("ray-uninstaller.exe");
             let uninstall_cmd = if uninstaller_exe.exists() {
                 format!("\"{}\"", uninstaller_exe.display())
             } else {
@@ -332,9 +342,9 @@ impl Installer {
                 format!("\"{}\" self-uninstall --remove-from-path", exe_path.display())
             };
 
-            write_string_val("DisplayName", "UPM - Universal Package Manager");
+            write_string_val("DisplayName", "RAY - Universal Package Manager");
             write_string_val("DisplayVersion", "0.1.0");
-            write_string_val("Publisher", "UPM Contributors");
+            write_string_val("Publisher", "Sarvesh.S");
             write_string_val("InstallLocation", &install_dir.to_string_lossy());
             write_string_val("UninstallString", &uninstall_cmd);
             write_string_val("QuietUninstallString", &quiet_cmd);
@@ -345,22 +355,20 @@ impl Installer {
         }
     }
 
-    /// Removes UPM entry from Windows Add/Remove Programs
+    /// Removes RAY entry from Windows Add/Remove Programs (and legacy UPM entry if present)
     pub fn unregister_windows_uninstall() -> Result<(), String> {
         unsafe {
-            let subkey: Vec<u16> = OsStr::new("Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\UPM\0")
-                .encode_wide()
-                .collect();
-            let status = RegDeleteKeyW(HKEY_CURRENT_USER, subkey.as_ptr());
-            if status == 0 || status == 2 {
-                Ok(())
-            } else {
-                Err(format!("Failed to delete uninstall registry key (code: {})", status))
+            for key_name in &["Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\RAY\0", "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\UPM\0"] {
+                let subkey: Vec<u16> = OsStr::new(key_name)
+                    .encode_wide()
+                    .collect();
+                let _ = RegDeleteKeyW(HKEY_CURRENT_USER, subkey.as_ptr());
             }
+            Ok(())
         }
     }
 
-    /// Installs UPM to the target directory and optionally adds it to PATH
+    /// Installs RAY to the target directory and optionally adds it to PATH
     pub fn install(
         source_exe: Option<&Path>,
         target_dir: Option<PathBuf>,
@@ -372,8 +380,8 @@ impl Installer {
         std::fs::create_dir_all(&install_dir)
             .map_err(|e| format!("Failed to create installation directory {}: {}", install_dir.display(), e))?;
 
-        let src_exe = Self::locate_upm_binary(source_exe)?;
-        let dest_exe = install_dir.join("upm.exe");
+        let src_exe = Self::locate_binary(source_exe)?;
+        let dest_exe = install_dir.join("ray.exe");
 
         // If the source exe is already the destination exe, skip copying to avoid locking errors
         let is_same_file = src_exe.canonicalize().ok() == dest_exe.canonicalize().ok();
@@ -382,10 +390,14 @@ impl Installer {
                 .map_err(|e| format!("Failed to copy {} to {}: {}", src_exe.display(), dest_exe.display(), e))?;
         }
 
-        println!("{} \x1b[1;32m✓\x1b[0m Installed \x1b[1mupm.exe\x1b[0m to \x1b[1;36m{}\x1b[0m", BADGE_UPM, dest_exe.display());
+        println!("{} \x1b[1;32m✓\x1b[0m Installed \x1b[1mray.exe\x1b[0m to \x1b[1;36m{}\x1b[0m", BADGE_RAY, dest_exe.display());
 
-        // Copy upm-uninstaller.exe if present
+        // Copy ray-uninstaller.exe if present
         let uninstaller_candidates = [
+            src_exe.parent().unwrap_or(Path::new("")).join("ray-uninstaller.exe"),
+            PathBuf::from("ray-uninstaller.exe"),
+            PathBuf::from("target/release/ray-uninstaller.exe"),
+            PathBuf::from("target/debug/ray-uninstaller.exe"),
             src_exe.parent().unwrap_or(Path::new("")).join("upm-uninstaller.exe"),
             PathBuf::from("upm-uninstaller.exe"),
             PathBuf::from("target/release/upm-uninstaller.exe"),
@@ -394,10 +406,10 @@ impl Installer {
 
         for cand in &uninstaller_candidates {
             if cand.exists() && cand.is_file() {
-                let dest_uninstaller = install_dir.join("upm-uninstaller.exe");
+                let dest_uninstaller = install_dir.join("ray-uninstaller.exe");
                 if cand.canonicalize().ok() != dest_uninstaller.canonicalize().ok() {
                     let _ = std::fs::copy(cand, &dest_uninstaller);
-                    println!("{} \x1b[1;32m✓\x1b[0m Installed \x1b[1mupm-uninstaller.exe\x1b[0m to \x1b[1;36m{}\x1b[0m", BADGE_UPM, dest_uninstaller.display());
+                    println!("{} \x1b[1;32m✓\x1b[0m Installed \x1b[1mray-uninstaller.exe\x1b[0m to \x1b[1;36m{}\x1b[0m", BADGE_RAY, dest_uninstaller.display());
                 }
                 break;
             }
@@ -405,26 +417,26 @@ impl Installer {
 
         // Register in Windows Add/Remove Programs
         if let Err(e) = Self::register_windows_uninstall(&install_dir, &dest_exe) {
-            eprintln!("{} \x1b[90m(Notice: Windows Settings uninstall registration skipped: {})\x1b[0m", BADGE_UPM, e);
+            eprintln!("{} \x1b[90m(Notice: Windows Settings uninstall registration skipped: {})\x1b[0m", BADGE_RAY, e);
         } else {
-            println!("{} \x1b[1;32m✓\x1b[0m Registered in Windows Installed Apps (Settings / Control Panel)", BADGE_UPM);
+            println!("{} \x1b[1;32m✓\x1b[0m Registered in Windows Installed Apps (Settings / Control Panel)", BADGE_RAY);
         }
 
         if add_to_path {
             match Self::add_dir_to_path(&install_dir) {
                 Ok(true) => {
-                    println!("{} \x1b[1;32m✓\x1b[0m Added \x1b[1m{}\x1b[0m to User \x1b[1;33mPATH\x1b[0m in Windows Registry", BADGE_UPM, install_dir.display());
-                    println!("{} \x1b[90m(Broadcasted WM_SETTINGCHANGE; restart terminal or open a new window to use 'upm')\x1b[0m", BADGE_UPM);
+                    println!("{} \x1b[1;32m✓\x1b[0m Added \x1b[1m{}\x1b[0m to User \x1b[1;33mPATH\x1b[0m in Windows Registry", BADGE_RAY, install_dir.display());
+                    println!("{} \x1b[90m(Broadcasted WM_SETTINGCHANGE; restart terminal or open a new window to use 'ray')\x1b[0m", BADGE_RAY);
                 }
                 Ok(false) => {
-                    println!("{} \x1b[90mDirectory is already in User PATH: {}\x1b[0m", BADGE_UPM, install_dir.display());
+                    println!("{} \x1b[90mDirectory is already in User PATH: {}\x1b[0m", BADGE_RAY, install_dir.display());
                 }
                 Err(e) => {
-                    eprintln!("{} \x1b[1;31mWarning:\x1b[0m Failed to update User PATH: {}", BADGE_UPM, e);
+                    eprintln!("{} \x1b[1;31mWarning:\x1b[0m Failed to update User PATH: {}", BADGE_RAY, e);
                 }
             }
         } else {
-            println!("{} Skipped adding to PATH. To use 'upm' globally, add \x1b[1m{}\x1b[0m to your PATH.", BADGE_UPM, install_dir.display());
+            println!("{} Skipped adding to PATH. To use 'ray' globally, add \x1b[1m{}\x1b[0m to your PATH.", BADGE_RAY, install_dir.display());
         }
 
         println!();
@@ -433,7 +445,7 @@ impl Installer {
         Ok(dest_exe)
     }
 
-    /// Uninstalls UPM from the installation directory, cleans PATH, and optionally cleans cache
+    /// Uninstalls RAY from the installation directory, cleans PATH, and optionally cleans cache
     pub fn uninstall(
         target_dir: Option<PathBuf>,
         remove_from_path: bool,
@@ -441,43 +453,47 @@ impl Installer {
     ) -> Result<(), String> {
         init_console_vt();
         let install_dir = target_dir.unwrap_or_else(Self::default_install_dir);
-        let dest_exe = install_dir.join("upm.exe");
-        let dest_uninstaller = install_dir.join("upm-uninstaller.exe");
+        let dest_exe = install_dir.join("ray.exe");
+        let dest_uninstaller = install_dir.join("ray-uninstaller.exe");
+        let legacy_exe = install_dir.join("upm.exe");
+        let legacy_uninstaller = install_dir.join("upm-uninstaller.exe");
 
         // 1. Unregister from Windows Add/Remove Programs
         let _ = Self::unregister_windows_uninstall();
-        println!("{} \x1b[1;32m✓\x1b[0m Unregistered UPM from Windows Settings / Control Panel", BADGE_UPM);
+        println!("{} \x1b[1;32m✓\x1b[0m Unregistered RAY from Windows Settings / Control Panel", BADGE_RAY);
 
         // 2. Remove from PATH
         if remove_from_path {
             match Self::remove_dir_from_path(&install_dir) {
                 Ok(true) => {
-                    println!("{} \x1b[1;32m✓\x1b[0m Removed \x1b[1m{}\x1b[0m from User PATH", BADGE_UPM, install_dir.display());
-                    println!("{} \x1b[90m(Broadcasted WM_SETTINGCHANGE)\x1b[0m", BADGE_UPM);
+                    println!("{} \x1b[1;32m✓\x1b[0m Removed \x1b[1m{}\x1b[0m from User PATH", BADGE_RAY, install_dir.display());
+                    println!("{} \x1b[90m(Broadcasted WM_SETTINGCHANGE)\x1b[0m", BADGE_RAY);
                 }
                 Ok(false) => {
-                    println!("{} \x1b[90mDirectory was not in User PATH\x1b[0m", BADGE_UPM);
+                    println!("{} \x1b[90mDirectory was not in User PATH\x1b[0m", BADGE_RAY);
                 }
                 Err(e) => {
-                    eprintln!("{} Failed to update User PATH: {}", BADGE_UPM, e);
+                    eprintln!("{} Failed to update User PATH: {}", BADGE_RAY, e);
                 }
             }
         } else {
-            println!("{} Preserved PATH entry for {}", BADGE_UPM, install_dir.display());
+            println!("{} Preserved PATH entry for {}", BADGE_RAY, install_dir.display());
         }
 
         // 3. Clean cache if requested
         if clean_cache {
             if let Ok(appdata) = std::env::var("LOCALAPPDATA") {
-                let upm_store = PathBuf::from(&appdata).join("upm").join("store");
-                let upm_run = PathBuf::from(&appdata).join("upm").join("run");
-                if upm_store.exists() {
-                    let _ = std::fs::remove_dir_all(&upm_store);
-                    println!("{} \x1b[1;32m✓\x1b[0m Removed package cache store: {}", BADGE_UPM, upm_store.display());
-                }
-                if upm_run.exists() {
-                    let _ = std::fs::remove_dir_all(&upm_run);
-                    println!("{} \x1b[1;32m✓\x1b[0m Removed ephemeral runtime directory: {}", BADGE_UPM, upm_run.display());
+                for folder in &["ray", "upm"] {
+                    let store = PathBuf::from(&appdata).join(folder).join("store");
+                    let run = PathBuf::from(&appdata).join(folder).join("run");
+                    if store.exists() {
+                        let _ = std::fs::remove_dir_all(&store);
+                        println!("{} \x1b[1;32m✓\x1b[0m Removed package cache store: {}", BADGE_RAY, store.display());
+                    }
+                    if run.exists() {
+                        let _ = std::fs::remove_dir_all(&run);
+                        println!("{} \x1b[1;32m✓\x1b[0m Removed ephemeral runtime directory: {}", BADGE_RAY, run.display());
+                    }
                 }
             }
         }
@@ -493,9 +509,11 @@ impl Installer {
         if running_inside_install_dir {
             // Schedule delayed self-deletion via cmd.exe so running file unlocks
             let script = format!(
-                "ping 127.0.0.1 -n 2 > nul & del /f /q \"{}\" 2>nul & del /f /q \"{}\" 2>nul & rmdir \"{}\" 2>nul",
+                "ping 127.0.0.1 -n 2 > nul & del /f /q \"{}\" 2>nul & del /f /q \"{}\" 2>nul & del /f /q \"{}\" 2>nul & del /f /q \"{}\" 2>nul & rmdir \"{}\" 2>nul",
                 dest_exe.display(),
                 dest_uninstaller.display(),
+                legacy_exe.display(),
+                legacy_uninstaller.display(),
                 install_dir.display()
             );
             std::process::Command::new("cmd.exe")
@@ -503,20 +521,18 @@ impl Installer {
                 .arg(script)
                 .spawn()
                 .map_err(|e| format!("Failed to spawn background deletion process: {}", e))?;
-            println!("{} \x1b[1;32m✓\x1b[0m Scheduled file cleanup and removal of \x1b[1m{}\x1b[0m", BADGE_UPM, install_dir.display());
+            println!("{} \x1b[1;32m✓\x1b[0m Scheduled file cleanup and removal of \x1b[1m{}\x1b[0m", BADGE_RAY, install_dir.display());
         } else {
-            if dest_exe.exists() {
-                let _ = std::fs::remove_file(&dest_exe);
-                println!("{} \x1b[1;32m✓\x1b[0m Removed \x1b[1m{}\x1b[0m", BADGE_UPM, dest_exe.display());
-            }
-            if dest_uninstaller.exists() {
-                let _ = std::fs::remove_file(&dest_uninstaller);
-                println!("{} \x1b[1;32m✓\x1b[0m Removed \x1b[1m{}\x1b[0m", BADGE_UPM, dest_uninstaller.display());
+            for f in &[&dest_exe, &dest_uninstaller, &legacy_exe, &legacy_uninstaller] {
+                if f.exists() {
+                    let _ = std::fs::remove_file(f);
+                    println!("{} \x1b[1;32m✓\x1b[0m Removed \x1b[1m{}\x1b[0m", BADGE_RAY, f.display());
+                }
             }
             let _ = std::fs::remove_dir(&install_dir);
         }
 
-        println!("{} \x1b[1;32m✓\x1b[0m UPM has been successfully uninstalled.", BADGE_UPM);
+        println!("{} \x1b[1;32m✓\x1b[0m RAY has been successfully uninstalled.", BADGE_RAY);
         Ok(())
     }
 }

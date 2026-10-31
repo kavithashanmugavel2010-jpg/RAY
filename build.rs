@@ -3,32 +3,39 @@ use std::fs;
 use std::path::Path;
 
 fn main() {
-    println!("cargo:rerun-if-changed=target/release/upm.exe");
-    println!("cargo:rerun-if-changed=target/release/upm-uninstaller.exe");
+    println!("cargo:rerun-if-changed=target/release/ray.exe");
+    println!("cargo:rerun-if-changed=target/release/ray-uninstaller.exe");
 
     let out_dir = env::var("OUT_DIR").unwrap();
+    let dest_ray = Path::new(&out_dir).join("embedded_ray.bin");
     let dest_upm = Path::new(&out_dir).join("embedded_upm.bin");
     let dest_uninstaller = Path::new(&out_dir).join("embedded_uninstaller.bin");
 
-    // Embed upm.exe if it exists
-    let candidates_upm = [
+    // Embed ray.exe if it exists (fallback to upm.exe during transition)
+    let candidates_ray = [
+        "target/release/ray.exe",
+        "ray.exe",
         "target/release/upm.exe",
         "upm.exe",
     ];
-    let mut found_upm = false;
-    for cand in &candidates_upm {
+    let mut found_ray = false;
+    for cand in &candidates_ray {
         if let Ok(bytes) = fs::read(cand) {
-            fs::write(&dest_upm, bytes).unwrap();
-            found_upm = true;
+            fs::write(&dest_ray, &bytes).unwrap();
+            fs::write(&dest_upm, &bytes).unwrap();
+            found_ray = true;
             break;
         }
     }
-    if !found_upm {
+    if !found_ray {
+        fs::write(&dest_ray, b"").unwrap();
         fs::write(&dest_upm, b"").unwrap();
     }
 
-    // Embed upm-uninstaller.exe if it exists
+    // Embed ray-uninstaller.exe if it exists
     let candidates_uninst = [
+        "target/release/ray-uninstaller.exe",
+        "ray-uninstaller.exe",
         "target/release/upm-uninstaller.exe",
         "upm-uninstaller.exe",
     ];
@@ -44,3 +51,4 @@ fn main() {
         fs::write(&dest_uninstaller, b"").unwrap();
     }
 }
+

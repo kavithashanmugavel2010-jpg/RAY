@@ -16,12 +16,12 @@ use cas::ContentAddressableStorage;
 use detector::{Ecosystem, EcosystemDetector};
 use terminal::{
     format_bytes, format_duration, init_console_vt, print_banner, print_version_and_guide,
-    BADGE_BIN, BADGE_JS, BADGE_PY, BADGE_SYS, BADGE_UPM,
+    BADGE_BIN, BADGE_JS, BADGE_PY, BADGE_SYS, BADGE_RAY, BADGE_UPM,
 };
 
 #[derive(Parser)]
 #[command(
-    name = "upm",
+    name = "ray",
     about = "Universal Package Manager - Ultra-high-performance cross-ecosystem installer for Windows",
     version = "0.1.0"
 )]
@@ -83,37 +83,37 @@ enum Commands {
         action: Option<CacheAction>,
     },
 
-    /// Install UPM itself onto your system and configure PATH
+    /// Install RAY itself onto your system and configure PATH
     #[command(alias = "setup")]
     SelfInstall {
-        /// Target installation directory (defaults to %LOCALAPPDATA%\upm\bin)
+        /// Target installation directory (defaults to %LOCALAPPDATA%\ray\bin)
         #[arg(short, long)]
         dir: Option<PathBuf>,
 
-        /// Add UPM installation directory to the User PATH
+        /// Add RAY installation directory to the User PATH
         #[arg(long, conflicts_with = "no_add_to_path")]
         add_to_path: bool,
 
-        /// Do NOT add UPM installation directory to the User PATH
+        /// Do NOT add RAY installation directory to the User PATH
         #[arg(long, conflicts_with = "add_to_path")]
         no_add_to_path: bool,
     },
 
-    /// Uninstall UPM from the system and clean up PATH
+    /// Uninstall RAY from the system and clean up PATH
     SelfUninstall {
-        /// Target installation directory (defaults to %LOCALAPPDATA%\upm\bin)
+        /// Target installation directory (defaults to %LOCALAPPDATA%\ray\bin)
         #[arg(short, long)]
         dir: Option<PathBuf>,
 
-        /// Remove UPM directory from the User PATH
+        /// Remove RAY directory from the User PATH
         #[arg(long, conflicts_with = "no_remove_from_path")]
         remove_from_path: bool,
 
-        /// Do NOT remove UPM directory from the User PATH
+        /// Do NOT remove RAY directory from the User PATH
         #[arg(long, conflicts_with = "remove_from_path")]
         no_remove_from_path: bool,
 
-        /// Also delete UPM package cache (%LOCALAPPDATA%\upm\store)
+        /// Also delete RAY package cache (%LOCALAPPDATA%\ray\store)
         #[arg(long)]
         clean_cache: bool,
 
@@ -125,7 +125,7 @@ enum Commands {
     /// Display hardware acceleration, SIMD diagnostics, and kernel driver capabilities
     Info,
 
-    /// Display UPM version, graphical banner, author credits, and quickstart guide
+    /// Display RAY version, graphical banner, author credits, and quickstart guide
     Version,
 }
 
@@ -177,10 +177,10 @@ async fn main() {
             } else if no_add_to_path {
                 false
             } else {
-                installer::Installer::prompt_yes_no("Add UPM to your User PATH?", true)
+                installer::Installer::prompt_yes_no("Add RAY to your User PATH?", true)
             };
             if let Err(e) = installer::Installer::install(None, dir, should_add) {
-                eprintln!("{} Failed to install UPM: {}", BADGE_UPM, e);
+                eprintln!("{} Failed to install RAY: {}", BADGE_RAY, e);
                 std::process::exit(1);
             }
         }
@@ -193,11 +193,11 @@ async fn main() {
         } => {
             if !assume_yes {
                 let confirmed = installer::Installer::prompt_yes_no(
-                    "Are you sure you want to uninstall UPM?",
+                    "Are you sure you want to uninstall RAY?",
                     true,
                 );
                 if !confirmed {
-                    println!("{} Uninstallation cancelled.", BADGE_UPM);
+                    println!("{} Uninstallation cancelled.", BADGE_RAY);
                     return;
                 }
             }
@@ -209,7 +209,7 @@ async fn main() {
             } else if assume_yes {
                 true
             } else {
-                installer::Installer::prompt_yes_no("Remove UPM from your User PATH?", true)
+                installer::Installer::prompt_yes_no("Remove RAY from your User PATH?", true)
             };
 
             let should_clean = if clean_cache {
@@ -218,13 +218,13 @@ async fn main() {
                 false
             } else {
                 installer::Installer::prompt_yes_no(
-                    "Delete UPM package store cache (%LOCALAPPDATA%\\upm\\store)?",
+                    "Delete RAY package store cache (%LOCALAPPDATA%\\ray\\store)?",
                     false,
                 )
             };
 
             if let Err(e) = installer::Installer::uninstall(dir, should_remove, should_clean) {
-                eprintln!("{} Failed to uninstall UPM: {}", BADGE_UPM, e);
+                eprintln!("{} Failed to uninstall RAY: {}", BADGE_RAY, e);
                 std::process::exit(1);
             }
         }
@@ -236,7 +236,7 @@ async fn main() {
         }
     }
 
-    if std::env::var("UPM_BENCH").is_ok() {
+    if std::env::var("RAY_BENCH").is_ok() || std::env::var("UPM_BENCH").is_ok() {
         println!(
             "\x1b[90mExecution finished in {}\x1b[0m",
             format_duration(start_total.elapsed())
@@ -557,15 +557,15 @@ async fn handle_run(cmd: &str, args: &[String], current_dir: &Path) {
     if node_bin.exists() {
         search_paths.push(node_bin);
     }
-    let upm_bin = binary::BinaryInstaller::get_bin_dir();
-    if upm_bin.exists() {
-        search_paths.push(upm_bin);
+    let ray_bin = binary::BinaryInstaller::get_bin_dir();
+    if ray_bin.exists() {
+        search_paths.push(ray_bin);
     }
 
     if !execute_command_with_paths(cmd, args, current_dir, &search_paths) {
         println!(
-            "{} '{}' not found in local project. Provisioning on-the-fly via UPM ephemeral runner...",
-            BADGE_UPM, cmd
+            "{} '{}' not found in local project. Provisioning on-the-fly via RAY ephemeral runner...",
+            BADGE_RAY, cmd
         );
         handle_x(cmd, args, current_dir).await;
     }
@@ -831,13 +831,13 @@ fn handle_cache(action: CacheAction) {
         CacheAction::Stats => {
             match cas.stats() {
                 Ok(stats) => {
-                    println!("\x1b[1mUPM Content-Addressable Storage (CAS):\x1b[0m");
+                    println!("\x1b[1mRAY Content-Addressable Storage (CAS):\x1b[0m");
                     println!("  Path:        {}", cas.root_dir().display());
                     println!("  Packages:    \x1b[1;36m{}\x1b[0m", stats.package_count);
                     println!("  Total Files: \x1b[1;33m{}\x1b[0m", stats.total_files);
                     println!("  Total Size:  \x1b[1;32m{}\x1b[0m", format_bytes(stats.total_size_bytes));
                 }
-                Err(e) => eprintln!("{} Failed to read cache stats: {}", BADGE_UPM, e),
+                Err(e) => eprintln!("{} Failed to read cache stats: {}", BADGE_RAY, e),
             }
         }
         CacheAction::Clean => {
@@ -845,11 +845,11 @@ fn handle_cache(action: CacheAction) {
                 Ok(freed) => {
                     println!(
                         "{} Cleaned CAS store. Reclaimed \x1b[1;32m{}\x1b[0m of disk space.",
-                        BADGE_UPM,
+                        BADGE_RAY,
                         format_bytes(freed)
                     );
                 }
-                Err(e) => eprintln!("{} Failed to clean cache: {}", BADGE_UPM, e),
+                Err(e) => eprintln!("{} Failed to clean cache: {}", BADGE_RAY, e),
             }
         }
     }
@@ -884,7 +884,7 @@ fn handle_info(current_dir: &Path) {
     println!("\n\x1b[1;37mSupported Ecosystems:\x1b[0m");
     println!("  {} Python               (Wheels, pyproject.toml, requirements.txt -> .venv)", BADGE_PY);
     println!("  {} JavaScript / Node    (npm tarballs, package.json -> node_modules)", BADGE_JS);
-    println!("  {} Standalone Binaries  (Direct .exe, GitHub assets -> ~/.upm/bin)", BADGE_BIN);
+    println!("  {} Standalone Binaries  (Direct .exe, GitHub assets -> ~/.ray/bin)", BADGE_BIN);
     println!("  {} System Toolchains    (Toolchains, shims, compilers)", BADGE_SYS);
 
     println!("\n\x1b[1;37mActive Directory Context:\x1b[0m");

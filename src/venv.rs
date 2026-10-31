@@ -126,7 +126,7 @@ impl VirtualEnv {
              include-system-site-packages = false\n\
              version = {}\n\
              executable = {}\n\
-             command = upm venv\n",
+             command = ray venv\n",
             home_dir,
             py_version,
             sys_python.as_ref().map(|p| p.to_string_lossy().to_string()).unwrap_or_default()

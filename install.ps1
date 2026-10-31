@@ -1,9 +1,9 @@
-# UPM - Universal Package Manager PowerShell Installer
+# RAY - Universal Package Manager PowerShell Installer
 # Usage:
 #   powershell -ExecutionPolicy Bypass -File .\install.ps1
 #   powershell -ExecutionPolicy Bypass -File .\install.ps1 -AddToPath
 #   powershell -ExecutionPolicy Bypass -File .\install.ps1 -AddToPath:$false
-#   powershell -ExecutionPolicy Bypass -File .\install.ps1 -InstallDir "C:\MyTools\upm"
+#   powershell -ExecutionPolicy Bypass -File .\install.ps1 -InstallDir "C:\MyTools\ray"
 
 [CmdletBinding()]
 param(
@@ -14,7 +14,7 @@ param(
     [switch]$NoPath = $false,
 
     [Parameter(Mandatory = $false)]
-    [string]$InstallDir = "$env:LOCALAPPDATA\upm\bin",
+    [string]$InstallDir = "$env:LOCALAPPDATA\ray\bin",
 
     [Parameter(Mandatory = $false)]
     [string]$BinaryPath = "",
@@ -24,12 +24,12 @@ param(
 )
 
 if ($Help) {
-    Write-Host "UPM Windows Installer" -ForegroundColor Cyan
+    Write-Host "RAY Windows Installer" -ForegroundColor Cyan
     Write-Host "Parameters:"
-    Write-Host "  -AddToPath         Add UPM to User PATH (default: `$true)"
-    Write-Host "  -NoPath            Do not add UPM to User PATH"
-    Write-Host "  -InstallDir <path> Custom installation directory (default: %LOCALAPPDATA%\upm\bin)"
-    Write-Host "  -BinaryPath <path> Specific path to upm.exe to install"
+    Write-Host "  -AddToPath         Add RAY to User PATH (default: `$true)"
+    Write-Host "  -NoPath            Do not add RAY to User PATH"
+    Write-Host "  -InstallDir <path> Custom installation directory (default: %LOCALAPPDATA%\ray\bin)"
+    Write-Host "  -BinaryPath <path> Specific path to ray.exe to install"
     exit 0
 }
 
@@ -38,18 +38,21 @@ if ($NoPath) {
 }
 
 Write-Host "==================================================================" -ForegroundColor Cyan
-Write-Host "  UPM - Universal Package Manager Installer (Native Win32)" -ForegroundColor White
+Write-Host "  RAY - Universal Package Manager Installer (Native Win32)" -ForegroundColor White
 Write-Host "==================================================================" -ForegroundColor Cyan
 Write-Host ""
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
-# 1. Locate or build upm.exe
+# 1. Locate or build ray.exe
 $targetExe = ""
 if ($BinaryPath -and (Test-Path $BinaryPath)) {
     $targetExe = (Resolve-Path $BinaryPath).Path
 } else {
     $candidates = @(
+        (Join-Path $scriptDir "ray.exe"),
+        (Join-Path $scriptDir "target\release\ray.exe"),
+        (Join-Path $scriptDir "target\debug\ray.exe"),
         (Join-Path $scriptDir "upm.exe"),
         (Join-Path $scriptDir "target\release\upm.exe"),
         (Join-Path $scriptDir "target\debug\upm.exe")
@@ -64,61 +67,73 @@ if ($BinaryPath -and (Test-Path $BinaryPath)) {
 
 if (-not $targetExe) {
     if (Test-Path (Join-Path $scriptDir "Cargo.toml")) {
-        Write-Host "[UPM] upm.exe not found. Building release binary via 'cargo build --release'..." -ForegroundColor Yellow
+        Write-Host "[RAY] ray.exe not found. Building release binary via 'cargo build --release'..." -ForegroundColor Yellow
         $prevPwd = Get-Location
         Set-Location $scriptDir
         & cargo build --release
         Set-Location $prevPwd
-        $relPath = Join-Path $scriptDir "target\release\upm.exe"
+        $relPath = Join-Path $scriptDir "target\release\ray.exe"
         if (Test-Path $relPath) {
             $targetExe = $relPath
         } else {
-            Write-Error "[UPM] Failed to find compiled binary at $relPath."
+            Write-Error "[RAY] Failed to find compiled binary at $relPath."
             exit 1
         }
     } else {
-        Write-Host "[UPM] Local binary not found. Downloading upm-setup.exe from GitHub..." -ForegroundColor Cyan
-        $downloadUrl = "https://github.com/kavithashanmugavel2010-jpg/upm/raw/main/dist/upm-setup.exe"
-        $tempSetup = Join-Path $env:TEMP "upm-setup.exe"
+        Write-Host "[RAY] Local binary not found. Downloading ray-setup.exe from GitHub..." -ForegroundColor Cyan
+        $downloadUrl = "https://github.com/kavithashanmugavel2010-jpg/upm/raw/main/dist/ray-setup.exe"
+        $tempSetup = Join-Path $env:TEMP "ray-setup.exe"
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-        Invoke-WebRequest -Uri $downloadUrl -OutFile $tempSetup -UseBasicParsing
+        try {
+            Invoke-WebRequest -Uri $downloadUrl -OutFile $tempSetup -UseBasicParsing
+        } catch {
+            $downloadUrl = "https://github.com/kavithashanmugavel2010-jpg/upm/raw/main/dist/upm-setup.exe"
+            Invoke-WebRequest -Uri $downloadUrl -OutFile $tempSetup -UseBasicParsing
+        }
         if (Test-Path $tempSetup) {
-            Write-Host "[UPM] Running setup installer..." -ForegroundColor Green
+            Write-Host "[RAY] Running setup installer..." -ForegroundColor Green
             & $tempSetup -y
             exit 0
         } else {
-            Write-Error "[UPM] Failed to download upm-setup.exe from GitHub."
+            Write-Error "[RAY] Failed to download setup installer from GitHub."
             exit 1
         }
     }
 }
 
-Write-Host "[UPM] Source executable: $targetExe" -ForegroundColor Gray
+Write-Host "[RAY] Source executable: $targetExe" -ForegroundColor Gray
 
 # 2. Prepare destination directory
 if (-not (Test-Path $InstallDir)) {
-    Write-Host "[UPM] Creating directory: $InstallDir" -ForegroundColor Gray
+    Write-Host "[RAY] Creating directory: $InstallDir" -ForegroundColor Gray
     New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
 }
 
-$destExe = Join-Path $InstallDir "upm.exe"
+$destExe = Join-Path $InstallDir "ray.exe"
 
 # 3. Copy binary
 try {
     Copy-Item -Path $targetExe -Destination $destExe -Force
-    Write-Host "[UPM] Installed upm.exe to: $destExe" -ForegroundColor Green
+    Write-Host "[RAY] Installed ray.exe to: $destExe" -ForegroundColor Green
 
-    # Copy upm-uninstaller.exe if found
+    # Also keep upm.exe alias in bin directory for backward compatibility
+    $destLegacyExe = Join-Path $InstallDir "upm.exe"
+    Copy-Item -Path $targetExe -Destination $destLegacyExe -Force
+
+    # Copy ray-uninstaller.exe if found
     $uninstallerCandidates = @(
+        (Join-Path $scriptDir "ray-uninstaller.exe"),
+        (Join-Path $scriptDir "target\release\ray-uninstaller.exe"),
+        (Join-Path $scriptDir "target\debug\ray-uninstaller.exe"),
         (Join-Path $scriptDir "upm-uninstaller.exe"),
         (Join-Path $scriptDir "target\release\upm-uninstaller.exe"),
         (Join-Path $scriptDir "target\debug\upm-uninstaller.exe")
     )
     foreach ($cand in $uninstallerCandidates) {
         if (Test-Path $cand) {
-            $destUninstaller = Join-Path $InstallDir "upm-uninstaller.exe"
+            $destUninstaller = Join-Path $InstallDir "ray-uninstaller.exe"
             Copy-Item -Path $cand -Destination $destUninstaller -Force
-            Write-Host "[UPM] Installed upm-uninstaller.exe to: $destUninstaller" -ForegroundColor Green
+            Write-Host "[RAY] Installed ray-uninstaller.exe to: $destUninstaller" -ForegroundColor Green
             break
         }
     }
@@ -132,15 +147,15 @@ try {
     }
 
     # Register in Windows Installed Apps (Settings / Control Panel)
-    $regPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\UPM"
+    $regPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\RAY"
     if (-not (Test-Path $regPath)) {
         New-Item -Path $regPath -Force | Out-Null
     }
-    Set-ItemProperty -Path $regPath -Name "DisplayName" -Value "UPM - Universal Package Manager" -Force
+    Set-ItemProperty -Path $regPath -Name "DisplayName" -Value "RAY - Universal Package Manager" -Force
     Set-ItemProperty -Path $regPath -Name "DisplayVersion" -Value "0.1.0" -Force
-    Set-ItemProperty -Path $regPath -Name "Publisher" -Value "UPM Contributors" -Force
+    Set-ItemProperty -Path $regPath -Name "Publisher" -Value "Sarvesh.S" -Force
     Set-ItemProperty -Path $regPath -Name "InstallLocation" -Value $InstallDir -Force
-    $uninstallerExe = Join-Path $InstallDir "upm-uninstaller.exe"
+    $uninstallerExe = Join-Path $InstallDir "ray-uninstaller.exe"
     if (Test-Path $uninstallerExe) {
         Set-ItemProperty -Path $regPath -Name "UninstallString" -Value "`"$uninstallerExe`"" -Force
         Set-ItemProperty -Path $regPath -Name "QuietUninstallString" -Value "`"$uninstallerExe`" -y" -Force
@@ -149,9 +164,9 @@ try {
         Set-ItemProperty -Path $regPath -Name "QuietUninstallString" -Value "`"$destExe`" self-uninstall -y" -Force
     }
     Set-ItemProperty -Path $regPath -Name "DisplayIcon" -Value $destExe -Force
-    Write-Host "[UPM] Registered in Windows Installed Apps (Settings / Control Panel)" -ForegroundColor Green
+    Write-Host "[RAY] Registered in Windows Installed Apps (Settings / Control Panel)" -ForegroundColor Green
 } catch {
-    Write-Error "[UPM] Failed to copy upm.exe to $destExe : $_"
+    Write-Error "[RAY] Failed to copy ray.exe to $destExe : $_"
     exit 1
 }
 
@@ -169,7 +184,7 @@ if ($AddToPath) {
         $alreadyInPath = $normalizedDirs -contains $normalizedInstall
 
         if ($alreadyInPath) {
-            Write-Host "[UPM] Directory already present in User PATH: $InstallDir" -ForegroundColor DarkGray
+            Write-Host "[RAY] Directory already present in User PATH: $InstallDir" -ForegroundColor DarkGray
         } else {
             $newPath = if ([string]::IsNullOrWhiteSpace($userPath)) {
                 $InstallDir
@@ -180,7 +195,7 @@ if ($AddToPath) {
             }
 
             [Environment]::SetEnvironmentVariable("Path", $newPath, "User")
-            Write-Host "[UPM] Successfully added '$InstallDir' to User PATH!" -ForegroundColor Green
+            Write-Host "[RAY] Successfully added '$InstallDir' to User PATH!" -ForegroundColor Green
         }
 
         # Also update current PowerShell process session PATH
@@ -188,21 +203,21 @@ if ($AddToPath) {
             $env:Path = "$InstallDir;$env:Path"
         }
     } catch {
-        Write-Warning "[UPM] Could not update User PATH automatically: $_"
+        Write-Warning "[RAY] Could not update User PATH automatically: $_"
     }
 } else {
-    Write-Host "[UPM] Skipped adding to PATH as requested (-AddToPath:`$false or -NoPath)." -ForegroundColor Yellow
-    Write-Host "      To use 'upm' globally, manually add '$InstallDir' to your PATH." -ForegroundColor Gray
+    Write-Host "[RAY] Skipped adding to PATH as requested (-AddToPath:`$false or -NoPath)." -ForegroundColor Yellow
+    Write-Host "      To use 'ray' globally, manually add '$InstallDir' to your PATH." -ForegroundColor Gray
 }
 
 Write-Host ""
 Write-Host "==================================================================" -ForegroundColor Cyan
-Write-Host "  Installation Complete! Running 'upm version'..." -ForegroundColor Green
+Write-Host "  Installation Complete! Running 'ray version'..." -ForegroundColor Green
 Write-Host "==================================================================" -ForegroundColor Cyan
 Write-Host ""
 
 & $destExe version
 
 Write-Host ""
-Write-Host "Thanks for choosing UPM! Built by Sarvesh.S" -ForegroundColor Green
+Write-Host "Thanks for choosing RAY! Built by Sarvesh.S" -ForegroundColor Green
 Write-Host ""

@@ -6,15 +6,15 @@ pub struct BinaryInstaller;
 impl BinaryInstaller {
     pub fn get_bin_dir() -> PathBuf {
         if let Ok(appdata) = std::env::var("LOCALAPPDATA") {
-            PathBuf::from(appdata).join("upm").join("bin")
+            PathBuf::from(appdata).join("ray").join("bin")
         } else if let Ok(userprofile) = std::env::var("USERPROFILE") {
-            PathBuf::from(userprofile).join(".upm").join("bin")
+            PathBuf::from(userprofile).join(".ray").join("bin")
         } else {
-            PathBuf::from(".upm").join("bin")
+            PathBuf::from(".ray").join("bin")
         }
     }
 
-    /// Installs a local or downloaded binary into the UPM bin directory.
+    /// Installs a local or downloaded binary into the RAY bin directory.
     pub fn install_binary(src_path: &Path, bin_name: &str) -> Result<PathBuf, String> {
         let bin_dir = Self::get_bin_dir();
         std::fs::create_dir_all(&bin_dir)

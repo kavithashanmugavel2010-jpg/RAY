@@ -3,3 +3,4 @@
 *.exe
 *.pdb
 !dist/upm-setup.exe
+!dist/ray-setup.exe

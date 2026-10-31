@@ -13,14 +13,14 @@ pub struct StoreStats {
 }
 
 impl ContentAddressableStorage {
-    /// Initializes Content-Addressable Storage at `%LOCALAPPDATA%\upm\store\`
+    /// Initializes Content-Addressable Storage at `%LOCALAPPDATA%\ray\store\`
     pub fn new() -> std::io::Result<Self> {
         let root = if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
-            PathBuf::from(local_app_data).join("upm").join("store")
+            PathBuf::from(local_app_data).join("ray").join("store")
         } else if let Ok(user_profile) = std::env::var("USERPROFILE") {
-            PathBuf::from(user_profile).join(".upm").join("store")
+            PathBuf::from(user_profile).join(".ray").join("store")
         } else {
-            PathBuf::from(".upm_store")
+            PathBuf::from(".ray_store")
         };
 
         std::fs::create_dir_all(&root)?;

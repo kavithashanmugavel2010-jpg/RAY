@@ -36,16 +36,16 @@ impl Ecosystem {
             Ecosystem::JavaScript => project_root.join("node_modules"),
             Ecosystem::Binary => {
                 if let Ok(appdata) = std::env::var("LOCALAPPDATA") {
-                    Path::new(&appdata).join("upm").join("bin")
+                    Path::new(&appdata).join("ray").join("bin")
                 } else if let Ok(userprofile) = std::env::var("USERPROFILE") {
-                    Path::new(&userprofile).join(".upm").join("bin")
+                    Path::new(&userprofile).join(".ray").join("bin")
                 } else {
                     project_root.join("bin")
                 }
             }
             Ecosystem::System => {
                 if let Ok(userprofile) = std::env::var("USERPROFILE") {
-                    Path::new(&userprofile).join(".upm").join("bin")
+                    Path::new(&userprofile).join(".ray").join("bin")
                 } else {
                     project_root.join("bin")
                 }

@@ -33,13 +33,14 @@ pub const BADGE_PY: &str = "\x1b[1;33m[PY]\x1b[0m";       // Yellow
 pub const BADGE_JS: &str = "\x1b[1;93m[JS]\x1b[0m";       // Bright Yellow
 pub const BADGE_BIN: &str = "\x1b[1;96m[BIN]\x1b[0m";     // Bright Cyan
 pub const BADGE_SYS: &str = "\x1b[1;92m[SYS]\x1b[0m";     // Bright Green
-pub const BADGE_UPM: &str = "\x1b[1;38;2;0;229;255m[UPM]\x1b[0m"; // Electric Cyan
+pub const BADGE_RAY: &str = "\x1b[1;38;2;0;229;255m[RAY]\x1b[0m"; // Electric Cyan
+pub const BADGE_UPM: &str = BADGE_RAY; // Backwards compatibility
 
 pub fn print_banner() {
     init_console_vt();
     println!(
         "\x1b[1;38;2;0;229;255m╔══════════════════════════════════════════════════════════════════╗\x1b[0m\n\
-         \x1b[1;38;2;0;229;255m║\x1b[0m  \x1b[1;37mUPM\x1b[0m \x1b[90m-\x1b[0m \x1b[1;38;2;0;229;255mUniversal Package Manager\x1b[0m \x1b[90m(Native Win32 x86_64 SIMD)\x1b[0m  \x1b[1;38;2;0;229;255m║\x1b[0m\n\
+         \x1b[1;38;2;0;229;255m║\x1b[0m  \x1b[1;37mRAY\x1b[0m \x1b[90m-\x1b[0m \x1b[1;38;2;0;229;255mUniversal Package Manager\x1b[0m \x1b[90m(Native Win32 x86_64 SIMD)\x1b[0m  \x1b[1;38;2;0;229;255m║\x1b[0m\n\
          \x1b[1;38;2;0;229;255m╚══════════════════════════════════════════════════════════════════╝\x1b[0m"
     );
 }
@@ -48,12 +49,12 @@ pub fn print_version_and_guide() {
     init_console_vt();
     println!(
         "\x1b[1;38;2;0;229;255m\
- ██╗   ██╗██████╗ ███╗   ███╗\n\
- ██║   ██║██╔══██╗████╗ ████║   \x1b[1;37mUniversal Package Manager\x1b[0m\n\
- ██║   ██║██████╔╝██╔████╔██║   \x1b[1;38;2;0;229;255mv0.1.0\x1b[0m \x1b[90m(x86_64-pc-windows-msvc Native SIMD)\x1b[0m\n\
- ██║   ██║██╔═══╝ ██║╚██╔╝██║   \x1b[1;32mEngineered & Built by Sarvesh.S\x1b[0m\n\
- ╚██████╔╝██║     ██║ ╚═╝ ██║   \x1b[36mZero-Copy NTFS / In-Memory SIMD / CAS\x1b[0m\n\
-  ╚═════╝ ╚═╝     ╚═╝     ╚═╝\x1b[0m\n\
+ ██████╗  █████╗ ██╗   ██╗\n\
+ ██╔══██╗██╔══██╗╚██╗ ██╔╝   \x1b[1;37mUniversal Package Manager\x1b[0m\n\
+ ██████╔╝███████║ ╚████╔╝    \x1b[1;38;2;0;229;255mv0.1.0\x1b[0m \x1b[90m(x86_64-pc-windows-msvc Native SIMD)\x1b[0m\n\
+ ██╔══██╗██╔══██║  ╚██╔╝     \x1b[1;32mEngineered & Built by Sarvesh.S\x1b[0m\n\
+ ██║  ██║██║  ██║   ██║      \x1b[36mZero-Copy NTFS / In-Memory SIMD / CAS\x1b[0m\n\
+ ╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝\x1b[0m\n\
 "
     );
 
@@ -61,29 +62,31 @@ pub fn print_version_and_guide() {
     println!(" \x1b[1;33m⚡ SUPPORTED ECOSYSTEMS & RUNTIMES\x1b[0m");
     println!("  • \x1b[1;33mPython (PyPI)\x1b[0m      : Direct wheel streaming, libdeflater SIMD, instant .venv linking");
     println!("  • \x1b[1;93mNode.js (npm)\x1b[0m      : npm registry tarballs, SIMD gzip unpack, node_modules linking");
-    println!("  • \x1b[1;96mStandalone Binaries\x1b[0m: Native .exe & GitHub releases provisioned to ~/.upm/bin");
+    println!("  • \x1b[1;96mStandalone Binaries\x1b[0m: Native .exe & GitHub releases provisioned to ~/.ray/bin");
     println!("  • \x1b[1;92mSystem Toolchains\x1b[0m  : Fast-path shimming and native tool execution");
 
     println!("\n\x1b[1;37m══════════════════════════════════════════════════════════════════════════\x1b[0m");
     println!(" \x1b[1;38;2;0;229;255m📖 QUICK USAGE GUIDE & COMMANDS\x1b[0m");
-    println!("  \x1b[1;36mupm install <package>\x1b[0m       Install packages (e.g. requests, npm:chalk, bin:ripgrep)");
-    println!("  \x1b[1;36mupm x <tool> [args...]\x1b[0m      Run any tool on-the-fly without project install (like npx/uvx)");
-    println!("  \x1b[1;36mupm run <cmd> [args...]\x1b[0m     Run inside active .venv or node_modules/.bin");
-    println!("  \x1b[1;36mupm env [--reset]\x1b[0m           Inspect or rebuild virtual environment (.venv)");
-    println!("  \x1b[1;36mupm cache stats | clean\x1b[0m     Display or purge Content-Addressable Storage (CAS)");
-    println!("  \x1b[1;36mupm self-install\x1b[0m            Install UPM into Windows and configure User PATH");
-    println!("  \x1b[1;36mupm self-uninstall\x1b[0m          Cleanly remove UPM and deregister from PATH");
-    println!("  \x1b[1;36mupm info\x1b[0m                    Display CPU SIMD vectorization & Win32 diagnostics");
-    println!("  \x1b[1;36mupm version\x1b[0m                 Display this banner, author credits, and guide");
+    println!("  \x1b[1;36mray install <package>\x1b[0m       Install packages (e.g. requests, npm:chalk, bin:ripgrep)");
+    println!("  \x1b[1;36mray x <tool> [args...]\x1b[0m      Run any tool on-the-fly without project install (like npx/uvx)");
+    println!("  \x1b[1;36mray run <cmd> [args...]\x1b[0m     Run inside active .venv or node_modules/.bin");
+    println!("  \x1b[1;36mray env [--reset]\x1b[0m           Inspect or rebuild virtual environment (.venv)");
+    println!("  \x1b[1;36mray cache stats | clean\x1b[0m     Display or purge Content-Addressable Storage (CAS)");
+    println!("  \x1b[1;36mray self-install\x1b[0m            Install RAY into Windows and configure User PATH");
+    println!("  \x1b[1;36mray self-uninstall\x1b[0m          Cleanly remove RAY and deregister from PATH");
+    println!("  \x1b[1;36mray info\x1b[0m                    Display CPU SIMD vectorization & Win32 diagnostics");
+    println!("  \x1b[1;36mray version\x1b[0m                 Display this banner, author credits, and guide");
 
     println!("\n\x1b[1;37m══════════════════════════════════════════════════════════════════════════\x1b[0m");
     println!(" \x1b[1;35m🚀 EXAMPLES TO TRY RIGHT NOW\x1b[0m");
     println!("  \x1b[90m# Run cowsay on-the-fly in milliseconds (no prior install):\x1b[0m");
-    println!("  upm x cowsay \"UPM engineered by Sarvesh.S\"");
+    println!("  ray x cowsay \"RAY engineered by Sarvesh.S\"");
     println!("  \x1b[90m# Install Python package with microsecond timings:\x1b[0m");
-    println!("  upm install requests --verbose");
+    println!("  ray install requests --verbose");
     println!("  \x1b[90m# Check Win32 hardware acceleration:\x1b[0m");
-    println!("  upm info");
+    println!("  ray info");
+    println!("  \x1b[90m# View version and guide:\x1b[0m");
+    println!("  ray version");
     println!("\x1b[1;37m══════════════════════════════════════════════════════════════════════════\x1b[0m\n");
 }
 
