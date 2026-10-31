@@ -32,6 +32,7 @@ zip = { version = "2.2", default-features = false, features = ["deflate"] }
 tar = "0.4"
 flate2 = "1.0"
 libdeflater = "1.22"
+[target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = [
     "Win32_Storage_FileSystem",
     "Win32_System_IO",

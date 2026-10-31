@@ -11,12 +11,16 @@ fn main() {
     let dest_upm = Path::new(&out_dir).join("embedded_upm.bin");
     let dest_uninstaller = Path::new(&out_dir).join("embedded_uninstaller.bin");
 
-    // Embed ray.exe if it exists (fallback to upm.exe during transition)
+    // Embed ray if it exists
     let candidates_ray = [
         "target/release/ray.exe",
         "ray.exe",
+        "target/release/ray",
+        "ray",
         "target/release/upm.exe",
         "upm.exe",
+        "target/release/upm",
+        "upm",
     ];
     let mut found_ray = false;
     for cand in &candidates_ray {
@@ -32,12 +36,16 @@ fn main() {
         fs::write(&dest_upm, b"").unwrap();
     }
 
-    // Embed ray-uninstaller.exe if it exists
+    // Embed ray-uninstaller if it exists
     let candidates_uninst = [
         "target/release/ray-uninstaller.exe",
         "ray-uninstaller.exe",
+        "target/release/ray-uninstaller",
+        "ray-uninstaller",
         "target/release/upm-uninstaller.exe",
         "upm-uninstaller.exe",
+        "target/release/upm-uninstaller",
+        "upm-uninstaller",
     ];
     let mut found_uninst = false;
     for cand in &candidates_uninst {

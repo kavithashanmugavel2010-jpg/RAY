@@ -1,0 +1,83 @@
+name: Build and Release Multi-Architecture Binaries
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Apple Silicon (macOS aarch64 - M1/M2/M3/M4)
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact_name: ray-aarch64-apple-darwin
+            binary_path: target/aarch64-apple-darwin/release/ray
+            is_windows: false
+
+          # Linux ARM64 (aarch64-unknown-linux-gnu)
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            artifact_name: ray-aarch64-unknown-linux-gnu
+            binary_path: target/aarch64-unknown-linux-gnu/release/ray
+            is_windows: false
+            use_cross: true
+
+          # Linux x86_64 (x86_64-unknown-linux-gnu)
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact_name: ray-x86_64-unknown-linux-gnu
+            binary_path: target/x86_64-unknown-linux-gnu/release/ray
+            is_windows: false
+
+          # Windows x86_64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact_name: ray-x86_64-pc-windows-msvc.exe
+            binary_path: target/x86_64-pc-windows-msvc/release/ray.exe
+            is_windows: true
+
+          # Windows ARM64
+          - os: windows-latest
+            target: aarch64-pc-windows-msvc
+            artifact_name: ray-aarch64-pc-windows-msvc.exe
+            binary_path: target/aarch64-pc-windows-msvc/release/ray.exe
+            is_windows: true
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install cross for Linux ARM64
+        if: matrix.use_cross == true
+        run: cargo install cross --git https://github.com/cross-rs/cross
+
+      - name: Build binary (native cargo)
+        if: matrix.use_cross != true
+        run: cargo build --release --target ${{ matrix.target }} --bin ray
+
+      - name: Build binary (cross for ARM64 Linux)
+        if: matrix.use_cross == true
+        run: cross build --release --target ${{ matrix.target }} --bin ray
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.binary_path }}
+          if-no-files-found: error

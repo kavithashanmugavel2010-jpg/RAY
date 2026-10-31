@@ -1,14 +1,21 @@
-use std::os::windows::ffi::OsStrExt;
 use std::path::Path;
+
+#[cfg(windows)]
+use std::os::windows::ffi::OsStrExt;
+#[cfg(windows)]
 use windows_sys::Win32::Foundation::{CloseHandle, HANDLE, INVALID_HANDLE_VALUE};
+#[cfg(windows)]
 use windows_sys::Win32::Storage::FileSystem::{
     CreateFileW, CreateHardLinkW, SetEndOfFile, SetFilePointerEx,
     FILE_ATTRIBUTE_NORMAL, FILE_BEGIN, FILE_GENERIC_READ, FILE_GENERIC_WRITE,
     FILE_SHARE_READ, FILE_SHARE_WRITE, OPEN_EXISTING, CREATE_ALWAYS,
 };
+#[cfg(windows)]
 use windows_sys::Win32::System::IO::DeviceIoControl;
+#[cfg(windows)]
 use windows_sys::Win32::System::Ioctl::FSCTL_DUPLICATE_EXTENTS_TO_FILE;
 
+#[cfg(windows)]
 #[repr(C)]
 #[allow(non_snake_case)]
 pub struct DUPLICATE_EXTENTS_DATA {
@@ -21,7 +28,7 @@ pub struct DUPLICATE_EXTENTS_DATA {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LinkMethod {
     BlockClone, // Dev Drive / ReFS
-    HardLink,   // NTFS HardLink
+    HardLink,   // NTFS / POSIX HardLink
     Copy,       // Standard fast copy (cross-volume fallback)
 }
 
@@ -33,7 +40,8 @@ pub struct LinkStats {
     pub total_bytes: u64,
 }
 
-/// Attempts Dev Drive / ReFS block cloning using FSCTL_DUPLICATE_EXTENTS_TO_FILE.
+/// Attempts Dev Drive / ReFS block cloning on Windows.
+#[cfg(windows)]
 pub fn try_block_clone(src: &Path, dst: &Path, byte_count: i64) -> bool {
     let src_w: Vec<u16> = src.as_os_str().encode_wide().chain(Some(0)).collect();
     let dst_w: Vec<u16> = dst.as_os_str().encode_wide().chain(Some(0)).collect();
@@ -97,7 +105,13 @@ pub fn try_block_clone(src: &Path, dst: &Path, byte_count: i64) -> bool {
     }
 }
 
-/// Creates a Win32 NTFS hardlink via CreateHardLinkW.
+#[cfg(not(windows))]
+pub fn try_block_clone(_src: &Path, _dst: &Path, _byte_count: i64) -> bool {
+    false
+}
+
+/// Creates a hardlink (Win32 CreateHardLinkW or POSIX hard_link on Mac/Linux).
+#[cfg(windows)]
 pub fn create_hardlink(src: &Path, dst: &Path) -> bool {
     let src_w: Vec<u16> = src.as_os_str().encode_wide().chain(Some(0)).collect();
     let dst_w: Vec<u16> = dst.as_os_str().encode_wide().chain(Some(0)).collect();
@@ -106,6 +120,11 @@ pub fn create_hardlink(src: &Path, dst: &Path) -> bool {
         let ret = CreateHardLinkW(dst_w.as_ptr(), src_w.as_ptr(), std::ptr::null());
         ret != 0
     }
+}
+
+#[cfg(not(windows))]
+pub fn create_hardlink(src: &Path, dst: &Path) -> bool {
+    std::fs::hard_link(src, dst).is_ok()
 }
 
 /// Links a single file using zero-copy primitives:

@@ -858,25 +858,42 @@ fn handle_cache(action: CacheAction) {
 fn handle_info(current_dir: &Path) {
     print_banner();
 
-    let has_avx2 = is_x86_feature_detected!("avx2");
-    let has_avx512 = is_x86_feature_detected!("avx512f");
-    let has_sse42 = is_x86_feature_detected!("sse4.2");
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    let (has_avx2, has_avx512, has_sse42) = (
+        is_x86_feature_detected!("avx2"),
+        is_x86_feature_detected!("avx512f"),
+        is_x86_feature_detected!("sse4.2"),
+    );
 
     let num_cpus = rayon::current_num_threads();
     let cas = ContentAddressableStorage::new().ok();
 
     println!("\x1b[1;37mSystem & Hardware Accelerator Diagnostics:\x1b[0m");
-    println!("  Target Architecture:     \x1b[1;36mx86_64-pc-windows-msvc (Native MSVC ABI)\x1b[0m");
+    println!("  Target Architecture:     \x1b[1;36m{}\x1b[0m", crate::terminal::target_arch_label());
     println!("  CPU Worker Threads:      \x1b[1;33m{} threads\x1b[0m (Rayon work-stealing pool)", num_cpus);
+
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     println!(
         "  SIMD Vectorization:      AVX2: {}, AVX-512: {}, SSE4.2: {}",
         if has_avx2 { "\x1b[1;32mSupported\x1b[0m" } else { "\x1b[90mDisabled\x1b[0m" },
         if has_avx512 { "\x1b[1;32mSupported\x1b[0m" } else { "\x1b[90mDisabled\x1b[0m" },
         if has_sse42 { "\x1b[1;32mSupported\x1b[0m" } else { "\x1b[90mDisabled\x1b[0m" }
     );
+
+    #[cfg(target_arch = "aarch64")]
+    println!(
+        "  SIMD Vectorization:      ARM NEON: \x1b[1;32mNative Hardware\x1b[0m, ASIMD: \x1b[1;32mActive\x1b[0m, CRC32/Crypto: \x1b[1;32mActive\x1b[0m"
+    );
+
     println!("  Decompression Engine:    \x1b[1;32mlibdeflater SIMD (in-memory zero disk write)\x1b[0m");
     println!("  Cryptographic Hashing:   \x1b[1;32mBLAKE3 SIMD (10+ GB/s)\x1b[0m");
-    println!("  Windows Link Primitives: \x1b[1;32mCreateHardLinkW + FSCTL_DUPLICATE_EXTENTS_TO_FILE\x1b[0m");
+
+    #[cfg(windows)]
+    println!("  Link Primitives:         \x1b[1;32mCreateHardLinkW + FSCTL_DUPLICATE_EXTENTS_TO_FILE (ReFS block cloning)\x1b[0m");
+    #[cfg(target_os = "macos")]
+    println!("  Link Primitives:         \x1b[1;32mclonefile() APFS Copy-on-Write + POSIX hard_link\x1b[0m");
+    #[cfg(all(not(windows), not(target_os = "macos")))]
+    println!("  Link Primitives:         \x1b[1;32mFICLONE (Btrfs/XFS reflink) + POSIX hard_link\x1b[0m");
     if let Some(ref c) = cas {
         println!("  CAS Store Directory:     {}", c.root_dir().display());
     }

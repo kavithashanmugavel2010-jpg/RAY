@@ -7,6 +7,8 @@ impl BinaryInstaller {
     pub fn get_bin_dir() -> PathBuf {
         if let Ok(appdata) = std::env::var("LOCALAPPDATA") {
             PathBuf::from(appdata).join("ray").join("bin")
+        } else if let Ok(home) = std::env::var("HOME") {
+            PathBuf::from(home).join(".ray").join("bin")
         } else if let Ok(userprofile) = std::env::var("USERPROFILE") {
             PathBuf::from(userprofile).join(".ray").join("bin")
         } else {
@@ -20,15 +22,25 @@ impl BinaryInstaller {
         std::fs::create_dir_all(&bin_dir)
             .map_err(|e| format!("Failed to create bin dir: {}", e))?;
 
-        let exe_name = if bin_name.ends_with(".exe") {
-            bin_name.to_string()
+        let exe_name = if cfg!(windows) {
+            if bin_name.ends_with(".exe") {
+                bin_name.to_string()
+            } else {
+                format!("{}.exe", bin_name)
+            }
         } else {
-            format!("{}.exe", bin_name)
+            bin_name.trim_end_matches(".exe").to_string()
         };
 
         let target_path = bin_dir.join(exe_name);
         crate::fs::link_file(src_path, &target_path)
             .map_err(|e| format!("Failed to link binary to {:?}: {}", target_path, e))?;
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let _ = std::fs::set_permissions(&target_path, std::fs::Permissions::from_mode(0o755));
+        }
 
         Ok(target_path)
     }
@@ -55,14 +67,26 @@ impl BinaryInstaller {
         std::fs::create_dir_all(&bin_dir)
             .map_err(|e| format!("Failed to create bin dir: {}", e))?;
 
-        let target_path = bin_dir.join(if bin_name.ends_with(".exe") {
-            bin_name.to_string()
+        let exe_name = if cfg!(windows) {
+            if bin_name.ends_with(".exe") {
+                bin_name.to_string()
+            } else {
+                format!("{}.exe", bin_name)
+            }
         } else {
-            format!("{}.exe", bin_name)
-        });
+            bin_name.trim_end_matches(".exe").to_string()
+        };
+
+        let target_path = bin_dir.join(exe_name);
 
         std::fs::write(&target_path, &bytes)
             .map_err(|e| format!("Failed to write binary: {}", e))?;
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let _ = std::fs::set_permissions(&target_path, std::fs::Permissions::from_mode(0o755));
+        }
 
         println!(
             "  -> Saved {} ({}) to {}",

@@ -17,6 +17,8 @@ impl ContentAddressableStorage {
     pub fn new() -> std::io::Result<Self> {
         let root = if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
             PathBuf::from(local_app_data).join("ray").join("store")
+        } else if let Ok(home) = std::env::var("HOME") {
+            PathBuf::from(home).join(".ray").join("store")
         } else if let Ok(user_profile) = std::env::var("USERPROFILE") {
             PathBuf::from(user_profile).join(".ray").join("store")
         } else {

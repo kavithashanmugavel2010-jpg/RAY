@@ -3,15 +3,22 @@ mod terminal;
 #[path = "../installer.rs"]
 mod installer;
 
+#[cfg(windows)]
 use std::ffi::OsStr;
+#[cfg(windows)]
 use std::os::windows::ffi::OsStrExt;
+#[cfg(windows)]
 use std::sync::atomic::{AtomicBool, Ordering};
 
+#[cfg(windows)]
 use windows_sys::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
+#[cfg(windows)]
 use windows_sys::Win32::Graphics::Gdi::{
     CreateFontW, HBRUSH, HFONT, COLOR_WINDOW, FW_BOLD, FW_NORMAL,
 };
+#[cfg(windows)]
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
+#[cfg(windows)]
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GetMessageW,
     GetSystemMetrics, MessageBoxW, PostQuitMessage, RegisterClassW, SendMessageW,
@@ -22,28 +29,43 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
     WS_CHILD, WS_MINIMIZEBOX, WS_OVERLAPPED, WS_SYSMENU, WS_VISIBLE,
 };
 
+#[allow(unused_imports)]
 use installer::Installer;
 
+#[cfg(windows)]
 const WS_CAPTION: u32 = 0x00C00000;
+#[cfg(windows)]
 const BST_CHECKED: usize = 1;
 
+#[cfg(windows)]
 const EMBEDDED_RAY: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/embedded_ray.bin"));
+#[cfg(windows)]
 const EMBEDDED_UNINSTALLER: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/embedded_uninstaller.bin"));
 
+#[cfg(windows)]
 const IDC_INSTALL_BTN: usize = 1001;
+#[cfg(windows)]
 const IDC_CANCEL_BTN: usize = 1002;
+#[cfg(windows)]
 const IDC_PATH_CHECKBOX: usize = 1003;
 
+#[cfg(windows)]
 static PATH_CHECKBOX_HWND: std::sync::atomic::AtomicIsize = std::sync::atomic::AtomicIsize::new(0);
+#[cfg(windows)]
 static STATUS_LABEL_HWND: std::sync::atomic::AtomicIsize = std::sync::atomic::AtomicIsize::new(0);
+#[cfg(windows)]
 static INSTALL_BTN_HWND: std::sync::atomic::AtomicIsize = std::sync::atomic::AtomicIsize::new(0);
+#[cfg(windows)]
 static CANCEL_BTN_HWND: std::sync::atomic::AtomicIsize = std::sync::atomic::AtomicIsize::new(0);
+#[cfg(windows)]
 static IS_INSTALLING: AtomicBool = AtomicBool::new(false);
 
+#[cfg(windows)]
 fn to_wide(s: &str) -> Vec<u16> {
     OsStr::new(s).encode_wide().chain(std::iter::once(0)).collect()
 }
 
+#[cfg(windows)]
 fn create_segoe_font(size: i32, bold: bool) -> HFONT {
     unsafe {
         let font_name = to_wide("Segoe UI");
@@ -66,6 +88,7 @@ fn create_segoe_font(size: i32, bold: bool) -> HFONT {
     }
 }
 
+#[cfg(windows)]
 unsafe extern "system" fn window_proc(
     hwnd: HWND,
     msg: u32,
@@ -203,6 +226,7 @@ unsafe extern "system" fn window_proc(
     }
 }
 
+#[cfg(windows)]
 fn perform_gui_install(hwnd: HWND) {
     let chk_hwnd = PATH_CHECKBOX_HWND.load(Ordering::SeqCst) as HWND;
     let status_hwnd = STATUS_LABEL_HWND.load(Ordering::SeqCst) as HWND;
@@ -298,6 +322,7 @@ fn perform_gui_install(hwnd: HWND) {
     }
 }
 
+#[cfg(windows)]
 fn run_gui_setup() {
     unsafe {
         let hinstance = GetModuleHandleW(std::ptr::null());
@@ -353,6 +378,7 @@ fn run_gui_setup() {
     }
 }
 
+#[cfg(windows)]
 fn main() {
     let args: Vec<String> = std::env::args().collect();
 
@@ -378,4 +404,11 @@ fn main() {
         // Standard double-click mode: show the GUI installation screen!
         run_gui_setup();
     }
+}
+
+#[cfg(not(windows))]
+fn main() {
+    println!("RAY Setup (GUI Installer) is tailored for Microsoft Windows.");
+    println!("For Apple Silicon (M1/M2/M3/M4 macOS) and Linux (ARM64 / x86_64), install using:");
+    println!("  curl -fsSL https://raw.githubusercontent.com/kavithashanmugavel2010-jpg/upm/main/install.sh | bash");
 }

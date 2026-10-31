@@ -2,6 +2,8 @@
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
+
+#[cfg(windows)]
 use windows_sys::Win32::System::Console::{
     GetConsoleMode, GetStdHandle, SetConsoleMode, ENABLE_VIRTUAL_TERMINAL_PROCESSING,
     STD_ERROR_HANDLE, STD_OUTPUT_HANDLE,
@@ -9,12 +11,32 @@ use windows_sys::Win32::System::Console::{
 
 static VT_INITIALIZED: AtomicBool = AtomicBool::new(false);
 
-/// Initializes Windows Console for Virtual Terminal (ANSI Escape sequences) processing.
+/// Returns the detected hardware architecture and runtime description
+pub fn target_arch_label() -> &'static str {
+    if cfg!(all(target_os = "macos", target_arch = "aarch64")) {
+        "Apple Silicon ARM64 (aarch64-apple-darwin Native NEON)"
+    } else if cfg!(all(target_os = "macos", target_arch = "x86_64")) {
+        "macOS x86_64 (Native SIMD)"
+    } else if cfg!(all(target_os = "windows", target_arch = "aarch64")) {
+        "Windows ARM64 (aarch64-pc-windows-msvc Native NEON)"
+    } else if cfg!(all(target_os = "windows", target_arch = "x86_64")) {
+        "Windows x86_64 (x86_64-pc-windows-msvc Native SIMD)"
+    } else if cfg!(all(target_os = "linux", target_arch = "aarch64")) {
+        "Linux ARM64 (aarch64 Native NEON)"
+    } else if cfg!(target_arch = "aarch64") {
+        "ARM64 (Native NEON)"
+    } else {
+        "x86_64 (Native SIMD)"
+    }
+}
+
+/// Initializes Virtual Terminal (ANSI Escape sequences) processing.
 pub fn init_console_vt() {
     if VT_INITIALIZED.swap(true, Ordering::SeqCst) {
         return;
     }
 
+    #[cfg(windows)]
     unsafe {
         for &std_handle in &[STD_OUTPUT_HANDLE, STD_ERROR_HANDLE] {
             let handle = GetStdHandle(std_handle);
@@ -40,8 +62,9 @@ pub fn print_banner() {
     init_console_vt();
     println!(
         "\x1b[1;38;2;0;229;255m╔══════════════════════════════════════════════════════════════════╗\x1b[0m\n\
-         \x1b[1;38;2;0;229;255m║\x1b[0m  \x1b[1;37mRAY\x1b[0m \x1b[90m-\x1b[0m \x1b[1;38;2;0;229;255mUniversal Package Manager\x1b[0m \x1b[90m(Native Win32 x86_64 SIMD)\x1b[0m  \x1b[1;38;2;0;229;255m║\x1b[0m\n\
-         \x1b[1;38;2;0;229;255m╚══════════════════════════════════════════════════════════════════╝\x1b[0m"
+         \x1b[1;38;2;0;229;255m║\x1b[0m  \x1b[1;37mRAY\x1b[0m \x1b[90m-\x1b[0m \x1b[1;38;2;0;229;255mUniversal Package Manager\x1b[0m \x1b[90m({})\x1b[0m  \x1b[1;38;2;0;229;255m║\x1b[0m\n\
+         \x1b[1;38;2;0;229;255m╚══════════════════════════════════════════════════════════════════╝\x1b[0m",
+        target_arch_label()
     );
 }
 
@@ -51,11 +74,12 @@ pub fn print_version_and_guide() {
         "\x1b[1;38;2;0;229;255m\
  ██████╗  █████╗ ██╗   ██╗\n\
  ██╔══██╗██╔══██╗╚██╗ ██╔╝   \x1b[1;37mUniversal Package Manager\x1b[0m\n\
- ██████╔╝███████║ ╚████╔╝    \x1b[1;38;2;0;229;255mv0.1.0\x1b[0m \x1b[90m(x86_64-pc-windows-msvc Native SIMD)\x1b[0m\n\
+ ██████╔╝███████║ ╚████╔╝    \x1b[1;38;2;0;229;255mv0.1.0\x1b[0m \x1b[90m({})\x1b[0m\n\
  ██╔══██╗██╔══██║  ╚██╔╝     \x1b[1;32mEngineered & Built by Sarvesh.S\x1b[0m\n\
- ██║  ██║██║  ██║   ██║      \x1b[36mZero-Copy NTFS / In-Memory SIMD / CAS\x1b[0m\n\
+ ██║  ██║██║  ██║   ██║      \x1b[36mZero-Copy Filesystem / In-Memory SIMD / CAS\x1b[0m\n\
  ╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝\x1b[0m\n\
-"
+",
+        target_arch_label()
     );
 
     println!("\x1b[1;37m══════════════════════════════════════════════════════════════════════════\x1b[0m");

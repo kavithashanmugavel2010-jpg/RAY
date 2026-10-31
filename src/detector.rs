@@ -37,6 +37,8 @@ impl Ecosystem {
             Ecosystem::Binary => {
                 if let Ok(appdata) = std::env::var("LOCALAPPDATA") {
                     Path::new(&appdata).join("ray").join("bin")
+                } else if let Ok(home) = std::env::var("HOME") {
+                    Path::new(&home).join(".ray").join("bin")
                 } else if let Ok(userprofile) = std::env::var("USERPROFILE") {
                     Path::new(&userprofile).join(".ray").join("bin")
                 } else {
@@ -44,7 +46,11 @@ impl Ecosystem {
                 }
             }
             Ecosystem::System => {
-                if let Ok(userprofile) = std::env::var("USERPROFILE") {
+                if let Ok(appdata) = std::env::var("LOCALAPPDATA") {
+                    Path::new(&appdata).join("ray").join("bin")
+                } else if let Ok(home) = std::env::var("HOME") {
+                    Path::new(&home).join(".ray").join("bin")
+                } else if let Ok(userprofile) = std::env::var("USERPROFILE") {
                     Path::new(&userprofile).join(".ray").join("bin")
                 } else {
                     project_root.join("bin")
