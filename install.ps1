@@ -8,7 +8,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $false)]
-    [switch]$AddToPath = $true,
+    [bool]$AddToPath = $true,
 
     [Parameter(Mandatory = $false)]
     [switch]$NoPath = $false,

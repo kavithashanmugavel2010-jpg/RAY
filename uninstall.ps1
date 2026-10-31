@@ -9,7 +9,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $false)]
-    [switch]$RemoveFromPath = $true,
+    [bool]$RemoveFromPath = $true,
 
     [Parameter(Mandatory = $false)]
     [switch]$KeepPath = $false,
