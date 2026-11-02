@@ -1,6 +1,6 @@
 # RAY - Universal Package Manager PowerShell Installer
 # Engineered & Built by Sarvesh.S
-# Repository: https://github.com/kavithashanmugavel2010-jpg/upm.git
+# Repository: https://github.com/kavithashanmugavel2010-jpg/RAY.git
 
 [CmdletBinding()]
 param(
@@ -46,7 +46,7 @@ Write-Host "  Engineered & Built by Sarvesh.S" -ForegroundColor Gray
 Write-Host "==================================================================" -ForegroundColor Cyan
 Write-Host ""
 
-# Safely determine script directory (handles both file execution and irm | iex)
+# Safely determine script directory (handles both local script execution and irm | iex)
 $scriptDir = $null
 try {
     if ($MyInvocation -and $MyInvocation.MyCommand -and $MyInvocation.MyCommand.Path) {
@@ -59,7 +59,10 @@ if (-not $scriptDir) {
     $scriptDir = $PWD.Path
 }
 
-$repoBaseUrl = "https://github.com/kavithashanmugavel2010-jpg/upm/raw/main"
+$repoUrls = @(
+    "https://github.com/kavithashanmugavel2010-jpg/RAY/raw/main",
+    "https://github.com/kavithashanmugavel2010-jpg/upm/raw/main"
+)
 
 # 1. Prepare destination directory
 try {
@@ -112,33 +115,52 @@ if (-not $installedRay) {
     }
 }
 
-# If not found locally, download directly via HTTP from GitHub repository
+# If not found locally, download atomically to temp file then place in destination
 if (-not $installedRay) {
     Write-Host "[RAY] Downloading ray.exe from GitHub repository..." -ForegroundColor Yellow
-    $rayDownloadUrl = "$repoBaseUrl/dist/ray.exe"
-    try {
-        Invoke-WebRequest -Uri $rayDownloadUrl -OutFile $destExe -UseBasicParsing
-        if ((Test-Path $destExe) -and ((Get-Item $destExe).Length -gt 100000)) {
-            $installedRay = $true
-            Write-Host "[RAY] Downloaded and installed ray.exe successfully!" -ForegroundColor Green
-        } else {
-            throw "Downloaded file is invalid or too small."
-        }
-    } catch {
-        Write-Warning "[RAY] Direct download from dist/ray.exe failed: $_"
-        # Secondary fallback: try target/release/ray.exe
+    $tempFile = Join-Path $env:TEMP "ray_$([Guid]::NewGuid().ToString('N')).exe"
+
+    foreach ($baseUrl in $repoUrls) {
+        $rayDownloadUrl = "$baseUrl/dist/ray.exe"
         try {
-            $rayDownloadUrl2 = "$repoBaseUrl/target/release/ray.exe"
-            Invoke-WebRequest -Uri $rayDownloadUrl2 -OutFile $destExe -UseBasicParsing
-            if ((Test-Path $destExe) -and ((Get-Item $destExe).Length -gt 100000)) {
+            Invoke-WebRequest -Uri $rayDownloadUrl -OutFile $tempFile -UseBasicParsing
+            if ((Test-Path $tempFile) -and ((Get-Item $tempFile).Length -gt 100000)) {
+                Stop-Process -Name "ray" -Force -ErrorAction SilentlyContinue
+                Start-Sleep -Milliseconds 150
+                Move-Item -Path $tempFile -Destination $destExe -Force
                 $installedRay = $true
-                Write-Host "[RAY] Downloaded ray.exe from release cache!" -ForegroundColor Green
+                Write-Host "[RAY] Downloaded and installed ray.exe successfully!" -ForegroundColor Green
+                break
             }
         } catch {
-            Write-Error "[RAY] Could not download ray.exe from GitHub: $_"
-            if (-not $NoPause) { Read-Host "Press Enter to exit..." }
-            exit 1
+            # Try next URL
         }
+    }
+
+    if (-not $installedRay) {
+        # Fallback: try downloading ray-setup.exe which contains embedded ray.exe
+        foreach ($baseUrl in $repoUrls) {
+            $setupUrl = "$baseUrl/dist/ray-setup.exe"
+            try {
+                $tempSetup = Join-Path $env:TEMP "ray_setup_$([Guid]::NewGuid().ToString('N')).exe"
+                Invoke-WebRequest -Uri $setupUrl -OutFile $tempSetup -UseBasicParsing
+                if ((Test-Path $tempSetup) -and ((Get-Item $tempSetup).Length -gt 1000000)) {
+                    Write-Host "[RAY] Extracting from ray-setup.exe..." -ForegroundColor Cyan
+                    & $tempSetup -y
+                    if (Test-Path $destExe) {
+                        $installedRay = $true
+                        Remove-Item -Path $tempSetup -Force -ErrorAction SilentlyContinue
+                        break
+                    }
+                }
+            } catch {}
+        }
+    }
+
+    if (-not $installedRay) {
+        Write-Error "[RAY] Could not install ray.exe. Please download ray-setup.exe directly from: https://github.com/kavithashanmugavel2010-jpg/RAY/raw/main/dist/ray-setup.exe"
+        if (-not $NoPause) { Read-Host "Press Enter to exit..." }
+        exit 1
     }
 }
 
@@ -146,9 +168,7 @@ if (-not $installedRay) {
 try {
     $destLegacyExe = Join-Path $InstallDir "upm.exe"
     Copy-Item -Path $destExe -Destination $destLegacyExe -Force
-} catch {
-    # Non-fatal
-}
+} catch {}
 
 # 3. Locate or download ray-uninstaller.exe
 $installedUninstaller = $false
@@ -167,15 +187,18 @@ foreach ($uCand in $localUninstallerCandidates) {
     }
 }
 if (-not $installedUninstaller) {
-    try {
-        $uninstallerUrl = "$repoBaseUrl/dist/ray-uninstaller.exe"
-        Invoke-WebRequest -Uri $uninstallerUrl -OutFile $destUninstaller -UseBasicParsing
-        if ((Test-Path $destUninstaller) -and ((Get-Item $destUninstaller).Length -gt 50000)) {
-            $installedUninstaller = $true
-            Write-Host "[RAY] Installed ray-uninstaller.exe" -ForegroundColor Green
-        }
-    } catch {
-        Write-Host "[RAY] (Uninstaller will use built-in 'ray self-uninstall')" -ForegroundColor Gray
+    $tempUFile = Join-Path $env:TEMP "ray_uninstaller_$([Guid]::NewGuid().ToString('N')).exe"
+    foreach ($baseUrl in $repoUrls) {
+        try {
+            $uninstallerUrl = "$baseUrl/dist/ray-uninstaller.exe"
+            Invoke-WebRequest -Uri $uninstallerUrl -OutFile $tempUFile -UseBasicParsing
+            if ((Test-Path $tempUFile) -and ((Get-Item $tempUFile).Length -gt 50000)) {
+                Move-Item -Path $tempUFile -Destination $destUninstaller -Force
+                $installedUninstaller = $true
+                Write-Host "[RAY] Installed ray-uninstaller.exe" -ForegroundColor Green
+                break
+            }
+        } catch {}
     }
 }
 
@@ -196,10 +219,18 @@ foreach ($sCand in $localSetupCandidates) {
     }
 }
 if (-not $installedSetup) {
-    try {
-        $setupUrl = "$repoBaseUrl/dist/ray-setup.exe"
-        Invoke-WebRequest -Uri $setupUrl -OutFile $destSetup -UseBasicParsing
-    } catch {}
+    $tempSFile = Join-Path $env:TEMP "ray_setup_$([Guid]::NewGuid().ToString('N')).exe"
+    foreach ($baseUrl in $repoUrls) {
+        try {
+            $setupUrl = "$baseUrl/dist/ray-setup.exe"
+            Invoke-WebRequest -Uri $setupUrl -OutFile $tempSFile -UseBasicParsing
+            if ((Test-Path $tempSFile) -and ((Get-Item $tempSFile).Length -gt 500000)) {
+                Move-Item -Path $tempSFile -Destination $destSetup -Force
+                $installedSetup = $true
+                break
+            }
+        } catch {}
+    }
 }
 
 # 5. Copy uninstall scripts
@@ -290,7 +321,6 @@ Write-Host ""
 
 # Prevent console from exiting automatically if run in an interactive window
 if (-not $NoPause) {
-    # Check if we were launched from a batch file or interactive prompt
     if ($Host.Name -eq "ConsoleHost" -and (-not $env:CI)) {
         Write-Host "Press Enter to finish..." -ForegroundColor Gray
         Read-Host | Out-Null
