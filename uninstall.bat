@@ -1,20 +1,27 @@
 @echo off
 setlocal EnableDelayedExpansion
 
-cd /d "%~dp0"
-
+title RAY Universal Package Manager Uninstaller
 echo ==================================================================
 echo   RAY - Universal Package Manager Windows Uninstaller
+echo   Engineered ^& Built by Sarvesh.S
 echo ==================================================================
 echo.
 
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0uninstall.ps1" %*
+if exist "%~dp0uninstall.ps1" (
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0uninstall.ps1" %*
+) else (
+    echo [RAY] Local uninstaller script not found. Running self-uninstall...
+    "%~dp0ray.exe" self-uninstall %*
+)
+
 if %ERRORLEVEL% NEQ 0 (
     echo.
-    echo [ERROR] RAY Uninstallation encountered an error.
-    pause
-    exit /b %ERRORLEVEL%
+    echo [ERROR] RAY Uninstallation encountered an error (Code: %ERRORLEVEL%).
 )
 
 echo.
-pause
+echo ==================================================================
+echo   Uninstallation complete. Press any key to exit this window.
+echo ==================================================================
+pause >nul
